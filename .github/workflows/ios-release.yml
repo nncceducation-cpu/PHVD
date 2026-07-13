@@ -130,8 +130,11 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
 
+          PROFILE_UUID=$(security cms -D -i $PROFILE_PATH | plutil -extract UUID raw -)
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp $PROFILE_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
+          cp $PROFILE_PATH ~/Library/MobileDevice/Provisioning\ Profiles/$PROFILE_UUID.mobileprovision
+          echo "installed profile as $PROFILE_UUID.mobileprovision"
+          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/
 
       # xcodebuild needs an "account" to do automatic signing. On a CI runner there is
       # no Apple ID signed into Xcode -- but the App Store Connect API key works as one.
@@ -225,11 +228,7 @@ jobs:
           xcodebuild -exportArchive \
             -archivePath $RUNNER_TEMP/App.xcarchive \
             -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist \
-            -exportPath $RUNNER_TEMP/export \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID_CLEAN" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_CLEAN"
+            -exportPath $RUNNER_TEMP/export
 
           echo "--- exported ---"
           ls -la $RUNNER_TEMP/export/
