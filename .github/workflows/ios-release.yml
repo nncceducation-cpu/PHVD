@@ -43,12 +43,17 @@ jobs:
           # frameworks carry a provisioning-profile setting and export fails with
           # "CapacitorApp.framework does not support provisioning profiles" (build #7).
           # Unsigned here is correct: the app's [CP] Embed Pods Frameworks phase re-signs
-          # them with the app's identity. This is the standard CocoaPods arrangement.
+          # them with the app's identity. Standard CocoaPods arrangement.
+          #
+          # This must go INSIDE the existing post_install hook -- CocoaPods rejects a
+          # second one ("Specifying multiple post_install hooks is unsupported", build #8).
           if ! grep -q CODE_SIGNING_ALLOWED ios/App/Podfile; then
-          cat >> ios/App/Podfile <<'PODEOF'
-
-          post_install do |installer|
-            assertDeploymentTarget(installer)
+            python3 - <<'PYEOF'
+          path = 'ios/App/Podfile'
+          src = open(path).read()
+          anchor = '  assertDeploymentTarget(installer)'
+          assert anchor in src, 'assertDeploymentTarget not found in Podfile'
+          inject = anchor + """
             installer.pods_project.targets.each do |t|
               t.build_configurations.each do |c|
                 c.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = ''
@@ -57,12 +62,13 @@ jobs:
                 c.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
                 c.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ''
               end
-            end
-          end
-          PODEOF
-          echo "Podfile: signing disabled on Pods targets"
+            end"""
+          open(path, 'w').write(src.replace(anchor, inject, 1))
+          print('Podfile: signing disabled on Pods targets (inside the existing hook)')
+          PYEOF
           fi
           echo "--- Podfile ---"; cat ios/App/Podfile; echo "---------------"
+          test "$(grep -c 'post_install do' ios/App/Podfile)" = "1" || { echo "ERROR: more than one post_install"; exit 1; }
 
           npx cap sync ios
 
