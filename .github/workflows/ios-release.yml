@@ -107,12 +107,27 @@ jobs:
       - name: Set up App Store Connect API key for xcodebuild
         env:
           ASC_KEY_BASE64: ${{ secrets.ASC_KEY_BASE64 }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          RAW_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          RAW_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          RAW_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          # Strip any stray whitespace. A trailing space in ASC_ISSUER_ID made Apple's
+          # auth call fail (DVTPortalResponseError on listTeams) in build #5.
+          KEY_ID=$(printf '%s' "$RAW_KEY_ID"    | tr -d '[:space:]')
+          ISSUER=$(printf '%s' "$RAW_ISSUER_ID" | tr -d '[:space:]')
+          TEAM=$(printf   '%s' "$RAW_TEAM_ID"   | tr -d '[:space:]')
+
           mkdir -p ~/private_keys
-          echo -n "$ASC_KEY_BASE64" | base64 --decode -o ~/private_keys/AuthKey_$ASC_KEY_ID.p8
-          echo "ASC_KEY_PATH=$HOME/private_keys/AuthKey_$ASC_KEY_ID.p8" >> $GITHUB_ENV
-          echo "wrote AuthKey_$ASC_KEY_ID.p8"
+          echo -n "$ASC_KEY_BASE64" | base64 --decode -o ~/private_keys/AuthKey_$KEY_ID.p8
+
+          echo "ASC_KEY_PATH=$HOME/private_keys/AuthKey_$KEY_ID.p8" >> $GITHUB_ENV
+          echo "ASC_KEY_ID_CLEAN=$KEY_ID"   >> $GITHUB_ENV
+          echo "ASC_ISSUER_CLEAN=$ISSUER"   >> $GITHUB_ENV
+          echo "TEAM_ID_CLEAN=$TEAM"        >> $GITHUB_ENV
+
+          echo "key id length:  ${#KEY_ID}  (expect 10)"
+          echo "issuer length:  ${#ISSUER}  (expect 36)"
+          echo "team id length: ${#TEAM}    (expect 10)"
 
       - name: Write ExportOptions.plist
         run: |
@@ -129,7 +144,7 @@ jobs:
           </dict>
           </plist>
           PLIST
-          sed -i '' "s/TEAM_ID_PLACEHOLDER/${{ secrets.APPLE_TEAM_ID }}/" $RUNNER_TEMP/ExportOptions.plist
+          sed -i '' "s/TEAM_ID_PLACEHOLDER/$TEAM_ID_CLEAN/" $RUNNER_TEMP/ExportOptions.plist
 
       - name: Archive
         run: |
@@ -146,9 +161,9 @@ jobs:
             -archivePath $RUNNER_TEMP/App.xcarchive \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
-            DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} \
+            -authenticationKeyID "$ASC_KEY_ID_CLEAN" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_CLEAN" \
+            DEVELOPMENT_TEAM=$TEAM_ID_CLEAN \
             PRODUCT_BUNDLE_IDENTIFIER=$BUNDLE_ID \
             CODE_SIGN_STYLE=Automatic \
             archive
@@ -161,8 +176,8 @@ jobs:
             -exportPath $RUNNER_TEMP/export \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+            -authenticationKeyID "$ASC_KEY_ID_CLEAN" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_CLEAN"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -173,13 +188,9 @@ jobs:
       # It does not release to the public App Store — you still press
       # "Submit for Review" yourself in App Store Connect.
       - name: Upload to App Store Connect
-        env:
-          ASC_KEY_BASE64: ${{ secrets.ASC_KEY_BASE64 }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           xcrun altool --upload-app -f "$RUNNER_TEMP/export/App.ipa" -t ios \
-            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+            --apiKey "$ASC_KEY_ID_CLEAN" --apiIssuer "$ASC_ISSUER_CLEAN"
 
       - name: Clean up keychain
         if: always()
