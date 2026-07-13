@@ -30,15 +30,30 @@ set /p GMAIL=  Email for git commits [khorshid.mohammad@gmail.com]:
 if "!GMAIL!"=="" set "GMAIL=khorshid.mohammad@gmail.com"
 
 REM ---- 2. repo URL ----
-for /f "delims=" %%i in ('git remote get-url origin 2^>nul') do set "REPO=%%i"
-if "%REPO%"=="" (
-  set /p REPO=  Your PHVD repo URL ^(https://github.com/USERNAME/PHVD.git^): 
-)
+echo   Open your PHVD repo on github.com and copy the address bar.
+echo   It looks like:  https://github.com/yourname/PHVD
+echo.
+set /p REPO=  Paste it here: 
 if "!REPO!"=="" (
-  echo   No URL given. Stopping.
+  echo   Nothing pasted. Stopping.
   pause
   exit /b 1
 )
+
+REM reject the placeholder
+echo !REPO! | findstr /i "USERNAME yourname your-username" >nul
+if not errorlevel 1 (
+  echo.
+  echo   That still contains the placeholder. Replace it with your REAL
+  echo   GitHub username - the name that appears in your own repo's URL.
+  echo.
+  pause
+  exit /b 1
+)
+
+REM tolerate a URL pasted without the .git suffix
+echo !REPO! | findstr /e /i ".git" >nul
+if errorlevel 1 set "REPO=!REPO!.git"
 
 echo.
 echo   Name : !GNAME!
