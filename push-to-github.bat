@@ -33,12 +33,8 @@ REM ---- 2. repo URL ----
 echo   Open your PHVD repo on github.com and copy the address bar.
 echo   It looks like:  https://github.com/yourname/PHVD
 echo.
-set /p REPO=  Paste it here: 
-if "!REPO!"=="" (
-  echo   Nothing pasted. Stopping.
-  pause
-  exit /b 1
-)
+set /p REPO=  Repo URL [press Enter for nncceducation-cpu/PHVD]: 
+if "!REPO!"=="" set "REPO=https://github.com/nncceducation-cpu/PHVD"
 
 REM reject the placeholder
 echo !REPO! | findstr /i "USERNAME yourname your-username" >nul
@@ -51,9 +47,12 @@ if not errorlevel 1 (
   exit /b 1
 )
 
-REM tolerate a URL pasted without the .git suffix
-echo !REPO! | findstr /e /i ".git" >nul
-if errorlevel 1 set "REPO=!REPO!.git"
+REM Normalise the URL. Strip any trailing slash, strip a .git if it's
+REM already there, then add exactly one back. (The old findstr check
+REM failed to spot an existing .git and produced PHVD.git.git.)
+if "!REPO:~-1!"=="/" set "REPO=!REPO:~0,-1!"
+if /i "!REPO:~-4!"==".git" set "REPO=!REPO:~0,-4!"
+set "REPO=!REPO!.git"
 
 echo.
 echo   Name : !GNAME!
