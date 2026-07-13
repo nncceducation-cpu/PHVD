@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+
+# build scratch (the mount won't let me delete these; git will just ignore them)
+tsconfig.tsbuildinfo
+vite.config.ts.timestamp-*.mjs
+src/styles.css
+
+# Capacitor generates the native project on the macOS build runner
+ios/
+
+# never commit these
+*.p12
+*.p8
+*.mobileprovision
+.env
+.env.local
