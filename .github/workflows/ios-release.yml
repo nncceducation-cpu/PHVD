@@ -223,14 +223,31 @@ jobs:
             PRODUCT_BUNDLE_IDENTIFIER=$BUNDLE_ID \
             archive
 
-      - name: Export .ipa
+      - name: Package the .ipa from the archive
         run: |
-          xcodebuild -exportArchive \
-            -archivePath $RUNNER_TEMP/App.xcarchive \
-            -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist \
-            -exportPath $RUNNER_TEMP/export
+          APP="$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app"
+          test -d "$APP" || { echo "no App.app in the archive"; exit 1; }
 
-          echo "--- exported ---"
+          echo "=== signature on the archived app ==="
+          codesign -dv --verbose=4 "$APP" 2>&1 | grep -E "Authority|TeamIdentifier|Identifier|Signature" || true
+
+          echo
+          echo "=== embedded provisioning profile ==="
+          test -f "$APP/embedded.mobileprovision" || { echo "NO embedded profile - not distributable"; exit 1; }
+          security cms -D -i "$APP/embedded.mobileprovision" | plutil -extract Name raw -
+          security cms -D -i "$APP/embedded.mobileprovision" | plutil -extract Entitlements.application-identifier raw -
+
+          echo
+          echo "=== verifying the signature is valid ==="
+          codesign --verify --deep --strict --verbose=2 "$APP"
+
+          echo
+          echo "=== packaging .ipa ==="
+          mkdir -p $RUNNER_TEMP/export/Payload
+          cp -R "$APP" $RUNNER_TEMP/export/Payload/
+          cd $RUNNER_TEMP/export
+          zip -qry App.ipa Payload
+          rm -rf Payload
           ls -la $RUNNER_TEMP/export/
 
       - uses: actions/upload-artifact@v4
