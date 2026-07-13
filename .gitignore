@@ -17,3 +17,11 @@ ios/
 *.mobileprovision
 .env
 .env.local
+
+# Apple signing material - NEVER commit any of this
+certs/
+*.certSigningRequest
+*.cer
+*.pem
+*.key
+*.txt

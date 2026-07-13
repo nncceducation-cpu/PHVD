@@ -73,10 +73,28 @@ jobs:
           echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERT_PATH
           echo -n "$PROVISIONING_PROFILE_BASE64" | base64 --decode -o $PROFILE_PATH
 
+          # macOS's keychain cannot import a PKCS#12 encrypted with PBES2/AES-256,
+          # which is what OpenSSL 3 produces by default. It reports this as
+          # "Unknown format in import". Re-export the bundle here, on the runner,
+          # in the legacy 3DES format the keychain understands. The runner has
+          # OpenSSL 3 WITH the legacy provider; a stock Windows box does not.
+          OSSL="$(brew --prefix openssl@3 2>/dev/null)/bin/openssl"
+          [ -x "$OSSL" ] || OSSL="$(command -v openssl)"
+          echo "using: $OSSL ($($OSSL version))"
+
+          LEGACY_P12=$RUNNER_TEMP/legacy.p12
+          "$OSSL" pkcs12 -in $CERT_PATH -passin pass:"$P12_PASSWORD" -nodes \
+            -out $RUNNER_TEMP/bundle.pem
+          "$OSSL" pkcs12 -export -legacy -in $RUNNER_TEMP/bundle.pem \
+            -passout pass:"$P12_PASSWORD" -out $LEGACY_P12
+          rm -f $RUNNER_TEMP/bundle.pem
+          echo "re-exported in keychain-compatible format:"
+          "$OSSL" pkcs12 -in $LEGACY_P12 -info -noout -passin pass:"$P12_PASSWORD" 2>&1 | grep -iE "MAC:|Encrypted"
+
           security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security import $CERT_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security import $LEGACY_P12 -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
 
