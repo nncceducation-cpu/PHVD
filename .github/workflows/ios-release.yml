@@ -38,6 +38,32 @@ jobs:
       - name: Generate / sync the native iOS project
         run: |
           if [ ! -d "ios" ]; then npx cap add ios; fi
+
+          # Strip signing off every Pods target. Otherwise the embedded Capacitor
+          # frameworks carry a provisioning-profile setting and export fails with
+          # "CapacitorApp.framework does not support provisioning profiles" (build #7).
+          # Unsigned here is correct: the app's [CP] Embed Pods Frameworks phase re-signs
+          # them with the app's identity. This is the standard CocoaPods arrangement.
+          if ! grep -q CODE_SIGNING_ALLOWED ios/App/Podfile; then
+          cat >> ios/App/Podfile <<'PODEOF'
+
+          post_install do |installer|
+            assertDeploymentTarget(installer)
+            installer.pods_project.targets.each do |t|
+              t.build_configurations.each do |c|
+                c.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = ''
+                c.build_settings['CODE_SIGN_IDENTITY'] = ''
+                c.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+                c.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+                c.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ''
+              end
+            end
+          end
+          PODEOF
+          echo "Podfile: signing disabled on Pods targets"
+          fi
+          echo "--- Podfile ---"; cat ios/App/Podfile; echo "---------------"
+
           npx cap sync ios
 
       - name: Generate app icons and splash screens
