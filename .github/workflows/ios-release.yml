@@ -199,21 +199,14 @@ jobs:
           <plist version="1.0">
           <dict>
             <key>method</key><string>app-store</string>
-            <key>signingStyle</key><string>manual</string>
+            <key>signingStyle</key><string>automatic</string>
             <key>destination</key><string>export</string>
             <key>teamID</key><string>TEAM_ID_PLACEHOLDER</string>
             <key>uploadSymbols</key><true/>
-            <key>signingCertificate</key><string>Apple Distribution</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>com.khorshidmohammad.phvd</key><string>PROFILE_NAME_PLACEHOLDER</string>
-            </dict>
           </dict>
           </plist>
           PLIST
-          PROFILE_NAME=$(security cms -D -i $RUNNER_TEMP/profile.mobileprovision | plutil -extract Name raw -)
           sed -i '' "s/TEAM_ID_PLACEHOLDER/$TEAM_ID_CLEAN/" $RUNNER_TEMP/ExportOptions.plist
-          sed -i '' "s/PROFILE_NAME_PLACEHOLDER/$PROFILE_NAME/" $RUNNER_TEMP/ExportOptions.plist
           cat $RUNNER_TEMP/ExportOptions.plist
 
       - name: Archive
@@ -232,7 +225,14 @@ jobs:
           xcodebuild -exportArchive \
             -archivePath $RUNNER_TEMP/App.xcarchive \
             -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist \
-            -exportPath $RUNNER_TEMP/export
+            -exportPath $RUNNER_TEMP/export \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID_CLEAN" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_CLEAN"
+
+          echo "--- exported ---"
+          ls -la $RUNNER_TEMP/export/
 
       - uses: actions/upload-artifact@v4
         with:
