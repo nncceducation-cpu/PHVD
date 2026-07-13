@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import DisclaimerGate from './components/DisclaimerGate';
 import PhvdTab from './components/PhvdTab';
+import References from './components/References';
 
 export default function App() {
   const [accepted, setAccepted] = useState(false);
@@ -14,8 +15,9 @@ export default function App() {
         <p className="text-xs text-slate-500">Post-Haemorrhagic Ventricular Dilatation</p>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-4 md:p-6">
+      <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         <PhvdTab />
+        <References />
       </main>
 
       <footer className="bg-white border-t border-slate-200 px-5 py-2 text-center text-[11px] text-slate-400">
