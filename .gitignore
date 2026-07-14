@@ -8,8 +8,9 @@ tsconfig.tsbuildinfo
 vite.config.ts.timestamp-*.mjs
 src/styles.css
 
-# Capacitor generates the native project on the macOS build runner
+# Capacitor regenerates the native projects on the CI runners
 ios/
+android/
 
 # never commit these
 *.p12

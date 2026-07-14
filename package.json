@@ -8,9 +8,12 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "sync": "npm run build && cap sync ios",
-    "ios": "npm run sync && cap open ios"
+    "ios": "npm run sync && cap open ios",
+    "build:web": "npm run build && rm -rf docs/app && mkdir -p docs/app && cp -r dist/. docs/app/",
+    "sync:android": "npm run build && cap sync android"
   },
   "dependencies": {
+    "@capacitor/android": "^6.2.1",
     "@capacitor/app": "^6.0.2",
     "@capacitor/core": "^6.2.0",
     "@capacitor/haptics": "^6.0.2",
