@@ -46,6 +46,9 @@ images and your unit's guideline.
 
 PHVD collects no personal data. Nothing you enter leaves your device.
 
+**Created by the Sarnat-NNCC program** (Neonatal Neuro-Critical Care).
+Developed by Dr Khorshid Mohammad, staff neonatologist.
+
 ## Keywords (100 char max)
 `neonatal,preterm,ventricular,index,cranial,ultrasound,IVH,NICU,neurology,reference`
 
@@ -84,7 +87,8 @@ Paste this. It pre-empts the two questions reviewers ask about clinical apps.
 > The app requires no account. There is no login. All processing is on-device and no user
 > data is collected or transmitted.
 >
-> Developer: Dr Khorshid Mohammad, staff neonatologist.
+> Developer: Dr Khorshid Mohammad, staff neonatologist, Sarnat-NNCC program
+> (Neonatal Neuro-Critical Care).
 
 ---
 

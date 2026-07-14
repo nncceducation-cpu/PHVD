@@ -8,7 +8,7 @@
  *
  * Bump CACHE_VERSION on every deploy or clients will keep serving the old bundle.
  */
-const CACHE_VERSION = 'phvd-v1';
+const CACHE_VERSION = 'phvd-v2';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

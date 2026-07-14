@@ -20,9 +20,9 @@ const REFERENCES: Reference[] = [
     note: 'Source of the Green / Yellow / Red risk-stratification framework and the management pathway shown in this app.',
   },
   {
-    authors: 'Brouwer MJ, de Vries LS, Groenendaal F, Koopman C, Pistorius LR, Mulder EJH, Benders MJNL.',
-    title:
-      'New reference values for the neonatal cerebral ventricles.',
+    authors:
+      'Brouwer MJ, de Vries LS, Groenendaal F, Koopman C, Pistorius LR, Mulder EJH, Benders MJNL.',
+    title: 'New reference values for the neonatal cerebral ventricles.',
     journal: 'Radiology. 2012;262(1):224-233.',
     doi: '10.1148/radiol.11110334',
     url: 'https://doi.org/10.1148/radiol.11110334',
@@ -53,8 +53,7 @@ export default function References() {
               <p className="text-xs text-slate-600 mt-1">{r.authors}</p>
               <p className="text-xs text-slate-500 italic">{r.journal}</p>
               <p className="text-xs text-slate-500 mt-1">
-                doi:{' '}
-                <span className="font-mono text-[11px] text-slate-600">{r.doi}</span>
+                doi: <span className="font-mono text-[11px] text-slate-600">{r.doi}</span>
               </p>
               <p className="text-xs text-slate-500 mt-2 leading-relaxed">{r.note}</p>
               <a
@@ -73,9 +72,18 @@ export default function References() {
 
       <p className="text-[11px] text-slate-400 mt-5 leading-relaxed">
         This app is an educational and reference tool. It reproduces the published frameworks above
-        for convenience; it does not extend, validate, or substitute for them, and it is not endorsed
-        by their authors.
+        for convenience; it does not extend, validate, or substitute for them, and it is not
+        endorsed by their authors.
       </p>
+
+      <div className="mt-5 pt-4 border-t border-slate-100">
+        <p className="text-xs font-semibold text-slate-700">
+          Created by the Sarnat&#8209;NNCC program
+        </p>
+        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+          Neonatal Neuro&#8209;Critical Care. Developed by Dr Khorshid Mohammad, staff neonatologist.
+        </p>
+      </div>
     </section>
   );
 }

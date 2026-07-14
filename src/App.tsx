@@ -20,8 +20,13 @@ export default function App() {
         <References />
       </main>
 
-      <footer className="bg-white border-t border-slate-200 px-5 py-2 text-center text-[11px] text-slate-400">
-        Educational reference only &mdash; not a diagnostic device. Clinical judgment required.
+      <footer className="bg-white border-t border-slate-200 px-5 py-2 text-center">
+        <p className="text-[11px] text-slate-400">
+          Educational reference only &mdash; not a diagnostic device. Clinical judgment required.
+        </p>
+        <p className="text-[11px] text-slate-500 mt-0.5">
+          A <span className="font-semibold text-slate-600">Sarnat&#8209;NNCC</span> program tool
+        </p>
       </footer>
     </div>
   );

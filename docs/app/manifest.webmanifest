@@ -1,7 +1,7 @@
 {
   "name": "PHVD — Post-Haemorrhagic Ventricular Dilatation",
   "short_name": "PHVD",
-  "description": "An educational and reference tool for neonatal clinicians. Plots serial ventricular measurements against published reference curves. Not a diagnostic device.",
+  "description": "An educational and reference tool for neonatal clinicians. Plots serial ventricular measurements against published reference curves. Not a diagnostic device. A Sarnat-NNCC program tool.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
