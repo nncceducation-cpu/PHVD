@@ -28,9 +28,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 ANDROID = ROOT / "android"
 
-TARGET_SDK = "35"
-AGP_VERSION = "8.7.3"
-GRADLE_VERSION = "8.9"
+TARGET_SDK = "36"
+AGP_VERSION = "8.9.1"
+GRADLE_VERSION = "8.11.1"
 
 VERSION_CODE = os.environ.get("ANDROID_VERSION_CODE", "1")
 VERSION_NAME = os.environ.get("ANDROID_VERSION_NAME", "1.0")
