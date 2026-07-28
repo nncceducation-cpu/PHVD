@@ -96,11 +96,19 @@ jobs:
           cd ios/App
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $MKT_VER" App/Info.plist || true
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NO" App/Info.plist || true
-          # Camera usage string for the measurement-scan feature (required by iOS; ios/ is regenerated each run)
+          # Usage strings required by iOS/Apple (ios/ is regenerated each run).
+          # @capacitor/camera references both the Camera and Photo Library APIs, so
+          # Apple requires purpose strings for all of them even though the app only
+          # uses the camera (ITMS-90683 otherwise rejects the upload).
           CAM_DESC="Used to photograph the ultrasound screen so measurements can be read automatically. Images are processed on-device and are not stored or shared."
+          PHOTO_DESC="This app does not access your photo library; a description is required because the camera component references the photo library API."
           /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string $CAM_DESC" App/Info.plist \
             || /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription $CAM_DESC" App/Info.plist
-          plutil -p App/Info.plist | grep -E 'CFBundle(Version|ShortVersionString)|NSCameraUsageDescription'
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string $PHOTO_DESC" App/Info.plist \
+            || /usr/libexec/PlistBuddy -c "Set :NSPhotoLibraryUsageDescription $PHOTO_DESC" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string $PHOTO_DESC" App/Info.plist \
+            || /usr/libexec/PlistBuddy -c "Set :NSPhotoLibraryAddUsageDescription $PHOTO_DESC" App/Info.plist
+          plutil -p App/Info.plist | grep -E 'CFBundle(Version|ShortVersionString)|NSCameraUsageDescription|NSPhotoLibrary'
 
       # --- Code signing -------------------------------------------------------
       # Requires these repo secrets (Settings > Secrets and variables > Actions):
