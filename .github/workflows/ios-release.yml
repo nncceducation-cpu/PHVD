@@ -91,7 +91,11 @@ jobs:
           cd ios/App
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.0" App/Info.plist || true
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NO" App/Info.plist || true
-          plutil -p App/Info.plist | grep -E 'CFBundle(Version|ShortVersionString)'
+          # Camera usage string for the measurement-scan feature (required by iOS; ios/ is regenerated each run)
+          CAM_DESC="Used to photograph the ultrasound screen so measurements can be read automatically. Images are processed on-device and are not stored or shared."
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string $CAM_DESC" App/Info.plist \
+            || /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription $CAM_DESC" App/Info.plist
+          plutil -p App/Info.plist | grep -E 'CFBundle(Version|ShortVersionString)|NSCameraUsageDescription'
 
       # --- Code signing -------------------------------------------------------
       # Requires these repo secrets (Settings > Secrets and variables > Actions):

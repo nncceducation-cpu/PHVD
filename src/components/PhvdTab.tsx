@@ -25,7 +25,11 @@ import {
   Save,
   LineChart,
   ClipboardList,
+  Camera,
+  X,
+  Loader2,
 } from 'lucide-react';
+import { captureAndDetect, isScanAvailable, type DetectedNumber } from '../lib/scan';
 
 // -- Types & Interfaces --
 
@@ -39,6 +43,7 @@ interface Measurement {
   ahwRight: number;
   todLeft: number;
   todRight: number;
+  ri: number; // Resistive Index (recorded only; not part of the risk criteria)
   clinical: {
     hcGrowth: boolean; // >2cm/week
     sutures: boolean; // separated
@@ -149,8 +154,43 @@ const PHVD: React.FC = () => {
     ahwRight: 0,
     todLeft: 0,
     todRight: 0,
+    ri: 0,
     clinical: { hcGrowth: false, sutures: false, fontanelle: false },
   });
+
+  // -- Scan (camera + on-device OCR) state --
+  const [scanChips, setScanChips] = useState<DetectedNumber[]>([]);
+  const [activeChipId, setActiveChipId] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const activeChip = scanChips.find((c) => c.id === activeChipId) || null;
+
+  const runScan = async () => {
+    setScanError(null);
+    setScanning(true);
+    try {
+      const found = await captureAndDetect();
+      if (found.length === 0) {
+        setScanError('No numbers detected. Try a closer, straighter photo of the measurement list.');
+      }
+      setScanChips(found);
+      setActiveChipId(null);
+    } catch (e: any) {
+      const msg = String(e?.message || e || '');
+      if (!/cancel/i.test(msg)) setScanError('Could not read the image. Please try again.');
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  // Fill a field from the currently-selected chip. mode 'mm' converts cm->mm.
+  const consumeChip = (setter: (n: number) => void, mode: 'mm' | 'raw'): boolean => {
+    if (!activeChip) return false;
+    setter(mode === 'mm' ? activeChip.valueMm : activeChip.value);
+    setScanChips((cs) => cs.filter((c) => c.id !== activeChip.id));
+    setActiveChipId(null);
+    return true;
+  };
 
   // Load from local storage
   useEffect(() => {
@@ -185,6 +225,7 @@ const PHVD: React.FC = () => {
       ahwRight: 0,
       todLeft: 0,
       todRight: 0,
+      ri: 0,
       clinical: { hcGrowth: false, sutures: false, fontanelle: false },
     });
   };
@@ -222,6 +263,9 @@ const PHVD: React.FC = () => {
               <strong>TOD:</strong> Thalamo-Occipital Distance
             </li>
             <li>
+              <strong>RI:</strong> Resistive Index (recorded only)
+            </li>
+            <li>
               <strong>PMA:</strong> Post-Menstrual Age
             </li>
           </ul>
@@ -236,6 +280,60 @@ const PHVD: React.FC = () => {
               <Plus className="text-blue-500" size={20} />
               New Assessment
             </h3>
+
+            {/* Scan from ultrasound (native app only) */}
+            {isScanAvailable() && (
+              <div className="mb-5">
+                <button
+                  onClick={runScan}
+                  disabled={scanning}
+                  className="w-full py-2.5 bg-slate-800 hover:bg-slate-900 disabled:opacity-60 text-white font-semibold rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors"
+                >
+                  {scanning ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
+                  {scanning ? 'Reading image…' : 'Scan from ultrasound'}
+                </button>
+                {scanError && (
+                  <p className="mt-2 text-xs text-rose-600">{scanError}</p>
+                )}
+                {scanChips.length > 0 && (
+                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        Detected — tap a number, then tap a field
+                      </p>
+                      <button
+                        onClick={() => { setScanChips([]); setActiveChipId(null); }}
+                        className="text-slate-400 hover:text-rose-500"
+                        aria-label="Clear detected numbers"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {scanChips.map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => setActiveChipId(activeChipId === c.id ? null : c.id)}
+                          className={`px-2.5 py-1 rounded-full text-xs font-mono font-semibold border transition-colors ${
+                            activeChipId === c.id
+                              ? 'bg-blue-600 border-blue-600 text-white'
+                              : 'bg-white border-slate-300 text-slate-700 hover:border-blue-400'
+                          }`}
+                        >
+                          {c.raw}
+                          {c.unit === 'cm' && (
+                            <span className={activeChipId === c.id ? 'text-blue-100' : 'text-slate-400'}> → {c.valueMm} mm</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-[11px] text-slate-400">
+                      cm values are converted to mm automatically. Always verify against the screen before saving.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Date & Age */}
             <div className="grid grid-cols-2 gap-4 mb-6">
@@ -279,23 +377,56 @@ const PHVD: React.FC = () => {
                   label="VI"
                   valL={currentM.viLeft}
                   valR={currentM.viRight}
-                  setL={(v) => setCurrentM({ ...currentM, viLeft: v })}
-                  setR={(v) => setCurrentM({ ...currentM, viRight: v })}
+                  setL={(v) => setCurrentM((m) => ({ ...m, viLeft: v }))}
+                  setR={(v) => setCurrentM((m) => ({ ...m, viRight: v }))}
+                  armed={!!activeChip}
+                  pickL={() => consumeChip((v) => setCurrentM((m) => ({ ...m, viLeft: v })), 'mm')}
+                  pickR={() => consumeChip((v) => setCurrentM((m) => ({ ...m, viRight: v })), 'mm')}
                 />
                 <MeasurementRow
                   label="AHW"
                   valL={currentM.ahwLeft}
                   valR={currentM.ahwRight}
-                  setL={(v) => setCurrentM({ ...currentM, ahwLeft: v })}
-                  setR={(v) => setCurrentM({ ...currentM, ahwRight: v })}
+                  setL={(v) => setCurrentM((m) => ({ ...m, ahwLeft: v }))}
+                  setR={(v) => setCurrentM((m) => ({ ...m, ahwRight: v }))}
+                  armed={!!activeChip}
+                  pickL={() => consumeChip((v) => setCurrentM((m) => ({ ...m, ahwLeft: v })), 'mm')}
+                  pickR={() => consumeChip((v) => setCurrentM((m) => ({ ...m, ahwRight: v })), 'mm')}
                 />
                 <MeasurementRow
                   label="TOD"
                   valL={currentM.todLeft}
                   valR={currentM.todRight}
-                  setL={(v) => setCurrentM({ ...currentM, todLeft: v })}
-                  setR={(v) => setCurrentM({ ...currentM, todRight: v })}
+                  setL={(v) => setCurrentM((m) => ({ ...m, todLeft: v }))}
+                  setR={(v) => setCurrentM((m) => ({ ...m, todRight: v }))}
+                  armed={!!activeChip}
+                  pickL={() => consumeChip((v) => setCurrentM((m) => ({ ...m, todLeft: v })), 'mm')}
+                  pickR={() => consumeChip((v) => setCurrentM((m) => ({ ...m, todRight: v })), 'mm')}
                 />
+
+                {/* RI — single value, recorded only */}
+                <div className="grid grid-cols-3 gap-4 items-center pt-1">
+                  <div className="font-bold text-sm text-slate-700">RI</div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="1.5"
+                    value={currentM.ri || ''}
+                    onClick={(e) => {
+                      if (activeChip) {
+                        e.preventDefault();
+                        consumeChip((v) => setCurrentM((m) => ({ ...m, ri: v })), 'raw');
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                    onChange={(e) => setCurrentM((m) => ({ ...m, ri: parseFloat(e.target.value) }))}
+                    className={`col-span-2 w-full p-2 text-center border rounded outline-none text-sm font-mono ${
+                      activeChip ? 'border-blue-400 ring-2 ring-blue-200 bg-blue-50/40' : 'border-slate-300 focus:border-blue-500'
+                    }`}
+                    placeholder="e.g. 0.75"
+                  />
+                </div>
               </div>
             </div>
 
@@ -439,29 +570,44 @@ const MeasurementRow: React.FC<{
   setL: (n: number) => void;
   valR: number;
   setR: (n: number) => void;
-}> = ({ label, valL, valR, setL, setR }) => (
-  <div className="grid grid-cols-3 gap-4 items-center">
-    <div className="font-bold text-sm text-slate-700">{label}</div>
-    <input
-      type="number"
-      step="0.1"
-      min="0"
-      value={valL || ''}
-      onChange={(e) => setL(parseFloat(e.target.value))}
-      className="w-full p-2 text-center border border-slate-300 rounded focus:border-blue-500 outline-none text-sm font-mono"
-      placeholder="L"
-    />
-    <input
-      type="number"
-      step="0.1"
-      min="0"
-      value={valR || ''}
-      onChange={(e) => setR(parseFloat(e.target.value))}
-      className="w-full p-2 text-center border border-slate-300 rounded focus:border-blue-500 outline-none text-sm font-mono"
-      placeholder="R"
-    />
-  </div>
-);
+  armed?: boolean;
+  pickL?: () => boolean;
+  pickR?: () => boolean;
+}> = ({ label, valL, valR, setL, setR, armed, pickL, pickR }) => {
+  const cls = (extra: string) =>
+    `w-full p-2 text-center border rounded outline-none text-sm font-mono ${
+      armed ? 'border-blue-400 ring-2 ring-blue-200 bg-blue-50/40' : 'border-slate-300 focus:border-blue-500'
+    } ${extra}`;
+  return (
+    <div className="grid grid-cols-3 gap-4 items-center">
+      <div className="font-bold text-sm text-slate-700">{label}</div>
+      <input
+        type="number"
+        step="0.1"
+        min="0"
+        value={valL || ''}
+        onClick={(e) => {
+          if (armed && pickL) { e.preventDefault(); pickL(); (e.target as HTMLInputElement).blur(); }
+        }}
+        onChange={(e) => setL(parseFloat(e.target.value))}
+        className={cls('')}
+        placeholder="L"
+      />
+      <input
+        type="number"
+        step="0.1"
+        min="0"
+        value={valR || ''}
+        onClick={(e) => {
+          if (armed && pickR) { e.preventDefault(); pickR(); (e.target as HTMLInputElement).blur(); }
+        }}
+        onChange={(e) => setR(parseFloat(e.target.value))}
+        className={cls('')}
+        placeholder="R"
+      />
+    </div>
+  );
+};
 
 const Checkbox: React.FC<{
   label: string;

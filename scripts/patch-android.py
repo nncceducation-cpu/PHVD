@@ -28,9 +28,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 ANDROID = ROOT / "android"
 
-TARGET_SDK = "36"
-AGP_VERSION = "8.9.1"
-GRADLE_VERSION = "8.11.1"
+TARGET_SDK = "35"
+AGP_VERSION = "8.7.3"
+GRADLE_VERSION = "8.9"
 
 VERSION_CODE = os.environ.get("ANDROID_VERSION_CODE", "1")
 VERSION_NAME = os.environ.get("ANDROID_VERSION_NAME", "1.0")
@@ -109,6 +109,23 @@ def app_gradle(t: str) -> str:
 edit(ANDROID / "app/build.gradle", app_gradle)
 
 
+# 4 -- CAMERA permission for the measurement-scan feature (on-device OCR).
+#      android/ is regenerated each run, so the permission is injected here.
+def manifest(t: str) -> str:
+    if "android.permission.CAMERA" not in t:
+        t = t.replace(
+            "</manifest>",
+            '    <uses-permission android:name="android.permission.CAMERA" />\n'
+            '    <uses-feature android:name="android.hardware.camera" android:required="false" />\n'
+            "</manifest>",
+            1,
+        )
+    return t
+
+
+edit(ANDROID / "app/src/main/AndroidManifest.xml", manifest)
+
+
 # -- verify, loudly. A silently-unsigned release build is the failure mode that
 #    wastes an afternoon, so assert rather than hope.
 checks = {
@@ -123,6 +140,9 @@ checks = {
         "signingConfig signingConfigs.release",
         f"versionCode {VERSION_CODE}",
         f'versionName "{VERSION_NAME}"',
+    ],
+    ANDROID / "app/src/main/AndroidManifest.xml": [
+        "android.permission.CAMERA",
     ],
 }
 
