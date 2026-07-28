@@ -10,6 +10,10 @@ on:
         description: 'Build number (must be higher than the last upload)'
         required: true
         default: '1'
+      marketing_version:
+        description: 'Marketing version (CFBundleShortVersionString, must be higher than any App Store version)'
+        required: true
+        default: '1.2.0'
   push:
     tags: ['v*']
 
@@ -88,8 +92,9 @@ jobs:
       - name: Set version and build number
         run: |
           BUILD_NO="${{ github.event.inputs.build_number || github.run_number }}"
+          MKT_VER="${{ github.event.inputs.marketing_version || '1.2.0' }}"
           cd ios/App
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.0" App/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $MKT_VER" App/Info.plist || true
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NO" App/Info.plist || true
           # Camera usage string for the measurement-scan feature (required by iOS; ios/ is regenerated each run)
           CAM_DESC="Used to photograph the ultrasound screen so measurements can be read automatically. Images are processed on-device and are not stored or shared."
