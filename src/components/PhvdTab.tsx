@@ -14,7 +14,7 @@
  * The clinical logic - getVIP97, getRiskZone, getManagementAdvice, RiskGraph - is
  * unchanged from the source.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   AlertTriangle,
   CheckCircle,
@@ -28,8 +28,10 @@ import {
   Camera,
   X,
   Loader2,
+  ImageDown,
 } from 'lucide-react';
 import { captureAndDetect, isScanAvailable, type DetectedNumber } from '../lib/scan';
+import { saveElementToPhotos, downloadElementAsPng, isSaveToPhotosAvailable } from '../lib/exportImage';
 
 // -- Types & Interfaces --
 
@@ -232,6 +234,32 @@ const PHVD: React.FC = () => {
 
   const currentRisk = getRiskZone(currentM);
   const advice = getManagementAdvice(currentRisk.zone);
+
+  // -- Save assessment as an image to device Photos --
+  const reportRef = useRef<HTMLDivElement>(null);
+  const [savingImg, setSavingImg] = useState(false);
+  const [imgMsg, setImgMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const saveImage = async () => {
+    if (!reportRef.current) return;
+    setImgMsg(null);
+    setSavingImg(true);
+    try {
+      if (isSaveToPhotosAvailable()) {
+        await saveElementToPhotos(reportRef.current);
+        setImgMsg({ ok: true, text: 'Saved to your Photos (PHVD album).' });
+      } else {
+        await downloadElementAsPng(reportRef.current);
+        setImgMsg({ ok: true, text: 'Image downloaded.' });
+      }
+    } catch (e: any) {
+      const m = String(e?.message || e || '');
+      setImgMsg({ ok: false, text: /denied|permission/i.test(m) ? 'Photos permission was denied.' : 'Could not save the image. Please try again.' });
+    } finally {
+      setSavingImg(false);
+      setTimeout(() => setImgMsg(null), 6000);
+    }
+  };
 
   return (
     <div className="space-y-8 pb-10">
@@ -485,6 +513,18 @@ const PHVD: React.FC = () => {
             >
               <Save size={18} /> Save Measurement
             </button>
+
+            <button
+              onClick={saveImage}
+              disabled={savingImg}
+              className="w-full py-3 border border-slate-300 hover:bg-slate-50 disabled:opacity-60 text-slate-700 font-bold rounded-lg flex items-center justify-center gap-2 transition-colors"
+            >
+              {savingImg ? <Loader2 size={18} className="animate-spin" /> : <ImageDown size={18} />}
+              {isSaveToPhotosAvailable() ? 'Save assessment to Photos' : 'Download assessment image'}
+            </button>
+            {imgMsg && (
+              <p className={`mt-2 text-xs ${imgMsg.ok ? 'text-emerald-600' : 'text-rose-600'}`}>{imgMsg.text}</p>
+            )}
           </div>
         </div>
 
@@ -555,6 +595,67 @@ const PHVD: React.FC = () => {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Off-screen printable report captured by "Save to Photos" */}
+      <div
+        aria-hidden="true"
+        style={{ position: 'absolute', left: '-10000px', top: 0, width: '420px' }}
+      >
+        <div ref={reportRef} className="bg-white p-6" style={{ width: '420px', fontFamily: 'system-ui, sans-serif' }}>
+          <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+            <LineChart className="text-blue-600" size={22} />
+            <div>
+              <div className="text-lg font-bold text-slate-800 leading-tight">PHVD Risk Assessment</div>
+              <div className="text-[11px] text-slate-500">El-Dib et al. (2020) framework</div>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+            <div><span className="text-slate-500">Date:</span> <span className="font-semibold text-slate-800">{currentM.date}</span></div>
+            <div><span className="text-slate-500">PMA:</span> <span className="font-semibold text-slate-800">{currentM.pma} wks</span></div>
+          </div>
+
+          <table className="mt-3 w-full text-sm border border-slate-200" style={{ borderCollapse: 'collapse' }}>
+            <thead>
+              <tr className="bg-slate-50 text-slate-500 text-xs">
+                <th className="text-left p-2 border border-slate-200">Measure</th>
+                <th className="p-2 border border-slate-200">Left (mm)</th>
+                <th className="p-2 border border-slate-200">Right (mm)</th>
+              </tr>
+            </thead>
+            <tbody className="font-mono text-slate-800">
+              <tr><td className="p-2 border border-slate-200 font-sans font-bold">VI</td><td className="p-2 border border-slate-200 text-center">{currentM.viLeft || '—'}</td><td className="p-2 border border-slate-200 text-center">{currentM.viRight || '—'}</td></tr>
+              <tr><td className="p-2 border border-slate-200 font-sans font-bold">AHW</td><td className="p-2 border border-slate-200 text-center">{currentM.ahwLeft || '—'}</td><td className="p-2 border border-slate-200 text-center">{currentM.ahwRight || '—'}</td></tr>
+              <tr><td className="p-2 border border-slate-200 font-sans font-bold">TOD</td><td className="p-2 border border-slate-200 text-center">{currentM.todLeft || '—'}</td><td className="p-2 border border-slate-200 text-center">{currentM.todRight || '—'}</td></tr>
+              <tr><td className="p-2 border border-slate-200 font-sans font-bold">RI</td><td className="p-2 border border-slate-200 text-center" colSpan={2}>{currentM.ri || '—'}</td></tr>
+            </tbody>
+          </table>
+
+          <div className={`mt-3 p-3 rounded-lg border ${advice.color}`}>
+            <div className="font-bold text-sm">{advice.title}</div>
+            {currentRisk.reasons.length > 0 && (
+              <ul className="mt-1 list-disc ml-4 text-xs">
+                {currentRisk.reasons.map((r, i) => (<li key={i}>{r}</li>))}
+              </ul>
+            )}
+          </div>
+
+          <div className="mt-3">
+            <div className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">Management plan</div>
+            <ol className="list-decimal ml-4 text-xs text-slate-700 space-y-0.5">
+              {advice.actions.map((a, i) => (<li key={i}>{a}</li>))}
+            </ol>
+          </div>
+
+          <div className="mt-3 h-48 w-full">
+            <RiskGraph measurements={[...measurements, { ...currentM, id: 'current' }]} />
+          </div>
+
+          <div className="mt-3 text-[9px] leading-snug text-slate-400 border-t border-slate-200 pt-2">
+            Decision-support / education aid only — not a diagnostic interpretation. Verify against the source images and your unit's protocol.
           </div>
         </div>
       </div>
