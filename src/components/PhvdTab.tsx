@@ -177,34 +177,16 @@ const PHVD: React.FC = () => {
       }
       setScanChips(found);
       setActiveChipId(null);
-      autoPlace(found);
+      // NOTE: values are intentionally NOT auto-placed into VI/AHW/L/R fields.
+      // OCR cannot tell which caliper is VI (straight) vs AHW (diagonal), nor
+      // which side is which (the screen is a mirror image), and sonographers
+      // measure in no fixed order — so the clinician assigns each number.
     } catch (e: any) {
       const msg = String(e?.message || e || '');
       if (!/cancel/i.test(msg)) setScanError('Could not read the image. Please try again.');
     } finally {
       setScanning(false);
     }
-  };
-
-  // Auto-place detected values into the fields. Measurement values (cm/mm) are
-  // converted to mm and placed into VI/AHW/TOD L/R in the order captured; a
-  // 0-1 value goes to RI. The chips stay visible so the clinician can tap to
-  // correct any that landed in the wrong field before saving.
-  const autoPlace = (found: DetectedNumber[]) => {
-    const measures = found
-      .filter((c) => c.kind === 'measure')
-      .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))
-      .map((c) => c.valueMm);
-    const ri = found.find((c) => c.kind === 'ri')?.value;
-    const order = ['viLeft', 'viRight', 'ahwLeft', 'ahwRight', 'todLeft', 'todRight'] as const;
-    setCurrentM((m) => {
-      const next: Measurement = { ...m };
-      order.forEach((field, i) => {
-        if (measures[i] !== undefined) next[field] = measures[i];
-      });
-      if (ri !== undefined) next.ri = ri;
-      return next;
-    });
   };
 
   // Fill a field from the currently-selected chip. mode 'mm' converts cm->mm.
@@ -349,7 +331,7 @@ const PHVD: React.FC = () => {
                   <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                        Auto-filled from photo (cm→mm) — verify, or tap a number then a field to correct
+                        Tap a number, then tap its field
                       </p>
                       <button
                         onClick={() => { setScanChips([]); setActiveChipId(null); }}
@@ -379,7 +361,8 @@ const PHVD: React.FC = () => {
                       ))}
                     </div>
                     <p className="mt-2 text-[11px] text-slate-400">
-                      cm values are converted to mm automatically. Always verify against the screen before saving.
+                      cm is converted to mm automatically. You assign each number, since the app can't tell VI from AHW
+                      or side: <span className="font-semibold text-slate-500">straight caliper = VI, diagonal = AHW; screen-left = patient's right.</span> Always verify against the screen before saving.
                     </p>
                   </div>
                 )}
