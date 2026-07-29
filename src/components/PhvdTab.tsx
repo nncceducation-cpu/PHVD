@@ -192,9 +192,10 @@ const PHVD: React.FC = () => {
   // correct any that landed in the wrong field before saving.
   const autoPlace = (found: DetectedNumber[]) => {
     const measures = found
-      .filter((c) => c.unit === 'cm' || c.unit === 'mm')
+      .filter((c) => c.kind === 'measure')
+      .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))
       .map((c) => c.valueMm);
-    const ri = found.find((c) => c.unit === '' && c.value > 0 && c.value <= 1.5)?.value;
+    const ri = found.find((c) => c.kind === 'ri')?.value;
     const order = ['viLeft', 'viRight', 'ahwLeft', 'ahwRight', 'todLeft', 'todRight'] as const;
     setCurrentM((m) => {
       const next: Measurement = { ...m };
@@ -369,6 +370,7 @@ const PHVD: React.FC = () => {
                               : 'bg-white border-slate-300 text-slate-700 hover:border-blue-400'
                           }`}
                         >
+                          {c.seq ? <span className={activeChipId === c.id ? 'text-blue-200' : 'text-slate-400'}>{c.seq}. </span> : null}
                           {c.raw}
                           {c.unit === 'cm' && (
                             <span className={activeChipId === c.id ? 'text-blue-100' : 'text-slate-400'}> → {c.valueMm} mm</span>
