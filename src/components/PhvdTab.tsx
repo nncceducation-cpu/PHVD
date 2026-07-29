@@ -177,12 +177,33 @@ const PHVD: React.FC = () => {
       }
       setScanChips(found);
       setActiveChipId(null);
+      autoPlace(found);
     } catch (e: any) {
       const msg = String(e?.message || e || '');
       if (!/cancel/i.test(msg)) setScanError('Could not read the image. Please try again.');
     } finally {
       setScanning(false);
     }
+  };
+
+  // Auto-place detected values into the fields. Measurement values (cm/mm) are
+  // converted to mm and placed into VI/AHW/TOD L/R in the order captured; a
+  // 0-1 value goes to RI. The chips stay visible so the clinician can tap to
+  // correct any that landed in the wrong field before saving.
+  const autoPlace = (found: DetectedNumber[]) => {
+    const measures = found
+      .filter((c) => c.unit === 'cm' || c.unit === 'mm')
+      .map((c) => c.valueMm);
+    const ri = found.find((c) => c.unit === '' && c.value > 0 && c.value <= 1.5)?.value;
+    const order = ['viLeft', 'viRight', 'ahwLeft', 'ahwRight', 'todLeft', 'todRight'] as const;
+    setCurrentM((m) => {
+      const next: Measurement = { ...m };
+      order.forEach((field, i) => {
+        if (measures[i] !== undefined) next[field] = measures[i];
+      });
+      if (ri !== undefined) next.ri = ri;
+      return next;
+    });
   };
 
   // Fill a field from the currently-selected chip. mode 'mm' converts cm->mm.
@@ -327,7 +348,7 @@ const PHVD: React.FC = () => {
                   <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                        Detected — tap a number, then tap a field
+                        Auto-filled from photo (cm→mm) — verify, or tap a number then a field to correct
                       </p>
                       <button
                         onClick={() => { setScanChips([]); setActiveChipId(null); }}
