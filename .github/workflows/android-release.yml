@@ -1,6 +1,8 @@
 name: Android build (signed .aab + .apk)
 
 on:
+  push:
+    branches: [api36-release]
   workflow_dispatch:
     inputs:
       version_code:
@@ -47,8 +49,8 @@ jobs:
 
       - name: Patch android/ for a signed Play release
         env:
-          ANDROID_VERSION_CODE: ${{ github.event.inputs.version_code }}
-          ANDROID_VERSION_NAME: ${{ github.event.inputs.version_name }}
+          ANDROID_VERSION_CODE: ${{ github.event.inputs.version_code || '8' }}
+          ANDROID_VERSION_NAME: ${{ github.event.inputs.version_name || '1.6' }}
         run: python3 scripts/patch-android.py
 
       - name: Restore the signing keystore
@@ -98,7 +100,7 @@ jobs:
       - name: Rename the artifacts
         run: |
           set -euo pipefail
-          V="${{ github.event.inputs.version_name }}-${{ github.event.inputs.version_code }}"
+          V="${{ github.event.inputs.version_name || '1.6' }}-${{ github.event.inputs.version_code || '8' }}"
           mkdir -p out
           cp android/app/build/outputs/bundle/release/app-release.aab "out/PHVD-${V}.aab"
           cp android/app/build/outputs/apk/release/app-release.apk    "out/PHVD-${V}.apk"
