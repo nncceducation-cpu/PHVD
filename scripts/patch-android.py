@@ -9,7 +9,7 @@ committed. Three things are wrong with the stock Capacitor 6 output:
   1. It targets SDK 34. Google Play rejects new apps below API 35 today, and will
      require API 36 from 31 Aug 2026. We go to 35 now; bump TARGET_SDK to 36
      before that date.
-  2. compileSdk 35 needs Android Gradle Plugin >= 8.6. Capacitor 6 ships 8.2.1.
+  2. compileSdk 36 needs a current Android Gradle Plugin. Capacitor 6 ships 8.2.1.
      So AGP and the Gradle wrapper both move up too.
   3. There is no signing config at all - the stock release buildType is unsigned.
 
@@ -28,12 +28,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 ANDROID = ROOT / "android"
 
-TARGET_SDK = "35"
-AGP_VERSION = "8.7.3"
-GRADLE_VERSION = "8.9"
+TARGET_SDK = "36"
+AGP_VERSION = "8.9.1"
+GRADLE_VERSION = "8.11.1"
 
-VERSION_CODE = os.environ.get("ANDROID_VERSION_CODE", "1")
-VERSION_NAME = os.environ.get("ANDROID_VERSION_NAME", "1.0")
+VERSION_CODE = os.environ.get("ANDROID_VERSION_CODE", "8")
+VERSION_NAME = os.environ.get("ANDROID_VERSION_NAME", "1.6")
 
 failures = []
 
