@@ -6,7 +6,8 @@ android/ is regenerated from scratch on every CI run (it is gitignored, exactly
 like ios/), so every change we need has to be reapplied here rather than
 committed. Three things are wrong with the stock Capacitor 6 output:
 
-  1. It targets SDK 34. Google Play requires API 36 for updates from\n     31 Aug 2026, so the release build now targets API 36.
+  1. It targets SDK 34. Google Play requires API 36 for updates from
+     31 Aug 2026, so the release build now targets API 36.
   2. compileSdk 36 needs a current Android Gradle Plugin. Capacitor 6 ships 8.2.1.
      So AGP and the Gradle wrapper both move up too.
   3. There is no signing config at all - the stock release buildType is unsigned.
@@ -159,5 +160,5 @@ if failures:
         print("  " + f)
     sys.exit(1)
 
-print("\nandroid/ patched: API 35, AGP %s, signed release, version %s (%s)"
-      % (AGP_VERSION, VERSION_NAME, VERSION_CODE))
+print("\nandroid/ patched: API %s, AGP %s, signed release, version %s (%s)"
+      % (TARGET_SDK, AGP_VERSION, VERSION_NAME, VERSION_CODE))
