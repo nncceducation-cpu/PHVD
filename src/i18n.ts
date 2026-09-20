@@ -616,6 +616,99 @@ export function currentLanguage(): Lang {
   return language;
 }
 
+const NATIVE_NAMES: Record<Lang, string> = {
+  en: 'English',
+  fr: 'Français',
+  es: 'Español',
+  pt: 'Português',
+};
+
+// Shown once, before the disclaimer, when no language has been chosen yet.
+// The panel carries data-i18n-switcher so the engine leaves its native names alone.
+function showLanguageChooser(): void {
+  const nav = document.querySelector<HTMLElement>('[data-i18n-switcher]');
+  if (nav) nav.style.display = 'none';
+
+  const overlay = document.createElement('div');
+  overlay.setAttribute('data-i18n-switcher', '');
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Language');
+  overlay.style.cssText = [
+    'position:fixed',
+    'inset:0',
+    'z-index:2147483600',
+    'display:flex',
+    'align-items:center',
+    'justify-content:center',
+    'padding:24px',
+    'padding-top:calc(env(safe-area-inset-top, 0px) + 24px)',
+    'padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 24px)',
+    'background:#0f172a',
+    'font:400 15px system-ui, -apple-system, Segoe UI, sans-serif',
+  ].join(';');
+
+  const card = document.createElement('div');
+  card.style.cssText = [
+    'width:100%',
+    'max-width:320px',
+    'display:flex',
+    'flex-direction:column',
+    'gap:10px',
+  ].join(';');
+
+  const heading = document.createElement('p');
+  heading.textContent = 'Language';
+  heading.style.cssText = [
+    'margin:0 0 2px',
+    'color:#e2e8f0',
+    'font:600 13px system-ui, -apple-system, Segoe UI, sans-serif',
+    'letter-spacing:0.08em',
+    'text-transform:uppercase',
+    'text-align:center',
+  ].join(';');
+  card.appendChild(heading);
+
+  const subheading = document.createElement('p');
+  subheading.textContent = 'Choisissez votre langue / Elija su idioma / Escolha o seu idioma';
+  subheading.style.cssText = [
+    'margin:0 0 10px',
+    'color:#94a3b8',
+    'font:400 12px system-ui, -apple-system, Segoe UI, sans-serif',
+    'line-height:1.5',
+    'text-align:center',
+  ].join(';');
+  card.appendChild(subheading);
+
+  SUPPORTED.forEach((code) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = NATIVE_NAMES[code];
+    button.style.cssText = [
+      'width:100%',
+      'min-height:52px',
+      'border:1px solid rgba(148,163,184,0.35)',
+      'border-radius:14px',
+      'background:#ffffff',
+      'color:#0f172a',
+      'font:600 16px system-ui, -apple-system, Segoe UI, sans-serif',
+      'cursor:pointer',
+    ].join(';');
+    button.addEventListener('click', () => {
+      setLanguage(code);
+      overlay.remove();
+      document.documentElement.style.overflow = previousOverflow;
+      if (nav) nav.style.display = '';
+    });
+    card.appendChild(button);
+  });
+
+  overlay.appendChild(card);
+  const previousOverflow = document.documentElement.style.overflow;
+  document.documentElement.style.overflow = 'hidden';
+  document.body.appendChild(overlay);
+}
+
 function start(): void {
   buildSwitcher();
 
@@ -640,7 +733,14 @@ function start(): void {
   window.alert = (message?: unknown) => nativeAlert(translate(String(message ?? '')));
 
   const saved = storedLanguage();
-  setLanguage(saved || deviceLanguage(), Boolean(saved));
+  if (saved) {
+    setLanguage(saved);
+    return;
+  }
+  // No choice on record: pre-select the device language, then let the clinician
+  // confirm it before the disclaimer is shown.
+  setLanguage(deviceLanguage(), false);
+  showLanguageChooser();
 }
 
 if (document.readyState === 'loading') {
