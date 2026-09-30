@@ -1,17 +1,17 @@
-name: Deploy web app to GitHub Pages
+name: Publish the web app to docs/app
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/app/**'
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: pages
+  group: docs-app
   cancel-in-progress: true
 
 jobs:
@@ -24,22 +24,19 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npm run build
-      - name: Assemble the published site
+      - name: Refresh docs/app from the fresh build
         run: |
-          rm -rf site
-          mkdir -p site/app
-          cp docs/index.html site/index.html
-          cp -r dist/. site/app/
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          rm -rf docs/app
+          mkdir -p docs/app
+          cp -r dist/. docs/app/
+      - name: Commit the rebuilt app
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/app
+          if git diff --cached --quiet; then
+            echo "docs/app already current"
+          else
+            git commit -m "Rebuild the published web app"
+            git push
+          fi
