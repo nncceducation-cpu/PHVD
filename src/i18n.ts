@@ -623,6 +623,11 @@ const NATIVE_NAMES: Record<Lang, string> = {
   pt: 'Português',
 };
 
+// A faint mark of the app's own visual language, so the first screen reads as
+// this app rather than an anonymous panel.
+const WATERMARK =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round"><path d="M24 296C140 268 300 214 456 150" stroke-dasharray="18 22"/><path d="M24 356C140 330 300 278 456 214"/><path d="M24 412C140 388 300 340 456 280" stroke-dasharray="18 22" opacity="0.6"/><g fill="#ffffff" stroke="none"><circle cx="96" cy="336" r="17"/><circle cx="186" cy="316" r="17"/><circle cx="276" cy="288" r="17"/><circle cx="366" cy="252" r="17"/></g></svg>';
+
 // Shown once, before the disclaimer, when no language has been chosen yet.
 // The panel carries data-i18n-switcher so the engine leaves its native names alone.
 function showLanguageChooser(): void {
@@ -644,12 +649,32 @@ function showLanguageChooser(): void {
     'padding:24px',
     'padding-top:calc(env(safe-area-inset-top, 0px) + 24px)',
     'padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 24px)',
-    'background:#0f172a',
+    'overflow:hidden',
+    'background:linear-gradient(165deg, #0b1220 0%, #15254c 55%, #0d1730 100%)',
     'font:400 15px system-ui, -apple-system, Segoe UI, sans-serif',
   ].join(';');
 
+  const mark = document.createElement('div');
+  mark.setAttribute('aria-hidden', 'true');
+  mark.style.cssText = [
+    'position:absolute',
+    'left:0',
+    'right:0',
+    'top:0',
+    'height:44%',
+    'pointer-events:none',
+    'background-repeat:no-repeat',
+    'background-position:center bottom',
+    'background-size:contain',
+    'opacity:0.26',
+    'background-image:url("data:image/svg+xml,' + encodeURIComponent(WATERMARK) + '")',
+  ].join(';');
+  overlay.appendChild(mark);
+
   const card = document.createElement('div');
   card.style.cssText = [
+    'position:relative',
+    'margin-top:14vh',
     'width:100%',
     'max-width:320px',
     'display:flex',
@@ -687,11 +712,12 @@ function showLanguageChooser(): void {
     button.style.cssText = [
       'width:100%',
       'min-height:52px',
-      'border:1px solid rgba(148,163,184,0.35)',
+      'border:0',
       'border-radius:14px',
       'background:#ffffff',
       'color:#0f172a',
       'font:600 16px system-ui, -apple-system, Segoe UI, sans-serif',
+      'box-shadow:0 6px 18px rgba(2,6,23,0.28)',
       'cursor:pointer',
     ].join(';');
     button.addEventListener('click', () => {
