@@ -27,6 +27,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 ANDROID = ROOT / "android"
 
+MIN_SDK = "24"  # Required by this app's existing Play automatic protection.
 TARGET_SDK = "36"
 AGP_VERSION = "8.9.1"
 GRADLE_VERSION = "8.11.1"
@@ -49,6 +50,7 @@ def edit(path: Path, fn):
 
 # 1 -- SDK levels
 def sdks(t: str) -> str:
+    t = re.sub(r"minSdkVersion\s*=\s*\d+", f"minSdkVersion = {MIN_SDK}", t)
     t = re.sub(r"compileSdkVersion\s*=\s*\d+", f"compileSdkVersion = {TARGET_SDK}", t)
     t = re.sub(r"targetSdkVersion\s*=\s*\d+", f"targetSdkVersion = {TARGET_SDK}", t)
     return t
@@ -129,6 +131,7 @@ edit(ANDROID / "app/src/main/AndroidManifest.xml", manifest)
 #    wastes an afternoon, so assert rather than hope.
 checks = {
     ANDROID / "variables.gradle": [
+        f"minSdkVersion = {MIN_SDK}",
         f"targetSdkVersion = {TARGET_SDK}",
         f"compileSdkVersion = {TARGET_SDK}",
     ],
