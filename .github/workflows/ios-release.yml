@@ -9,7 +9,7 @@ on:
       build_number:
         description: 'Build number (must be higher than the last upload)'
         required: true
-        default: '22'
+        default: '23'
       marketing_version:
         description: 'Marketing version (CFBundleShortVersionString, must be higher than any App Store version)'
         required: true
@@ -100,6 +100,9 @@ jobs:
           cd ios/App
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $MKT_VER" App/Info.plist || true
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NO" App/Info.plist || true
+          # PHVD implements no proprietary or non-OS encryption algorithms.
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" App/Info.plist \
+            || /usr/libexec/PlistBuddy -c "Set :ITSAppUsesNonExemptEncryption false" App/Info.plist
           # Usage strings required by iOS/Apple (ios/ is regenerated each run).
           # @capacitor/camera references both the Camera and Photo Library APIs, so
           # Apple requires purpose strings for all of them even though the app only

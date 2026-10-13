@@ -80,6 +80,10 @@
     "status": "PASS"
   },
   {
+    "name": "Selected management follows measurements; all zones remain at the end",
+    "status": "PASS"
+  },
+  {
     "name": "Assessment PNG export",
     "status": "PASS"
   }

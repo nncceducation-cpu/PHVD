@@ -1,6 +1,6 @@
 # PHVD accuracy and bug audit
 
-Audit date: 13 October 2026. Target: current PHVD repository source corresponding to https://nncceducation-cpu.github.io/PHVD/app/. The corrected version remains local; this audit does not publish or update the live website.
+Audit date: 13 October 2026. Target: current PHVD repository source corresponding to https://nncceducation-cpu.github.io/PHVD/app/. The corrected calculator has been pushed and deployed. Native 1.6.1 releases are being staged separately; build and store status is recorded in the release folder.
 
 ## Calculation accuracy
 
@@ -35,7 +35,7 @@ The main accuracy suite totals 7,677,544 checks. Its decimal-grid oracle uses in
 
 ## Browser and production verification
 
-The 21-scenario browser suite covers storage failures, malformed and legacy history, persistence and reload, invalid saves, clinical signs, keyboard access, local dates, decimal-comma entry, all four language versions, phone/tablet/desktop widths (320, 375, 768 and 1200 px), translated risk strings, and PNG exports in all four languages. Edge and WebKit production runs must have 21/21 passing results in their accompanying JSON files. First-install offline use and cache isolation have six passing production checks. TypeScript and the production build pass.
+The 22-scenario browser suite covers storage failures, malformed and legacy history, persistence and reload, invalid saves, clinical signs, keyboard access, local dates, decimal-comma entry, all four language versions, phone/tablet/desktop widths (320, 375, 768 and 1200 px), translated risk strings, and PNG exports in all four languages. It also checks that the selected management plan follows measurement changes and clinical signs, while all three reference cards follow the assessment and graphs at the bottom. Edge and WebKit production runs must have 22/22 passing results in their accompanying JSON files. First-install offline use and cache isolation have six passing production checks. TypeScript and the production build pass.
 
 ## Limits and decisions needing clinical awareness
 

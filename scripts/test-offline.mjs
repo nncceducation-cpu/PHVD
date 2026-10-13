@@ -26,7 +26,7 @@ try{
     if(!navigator.serviceWorker.controller)await new Promise(resolve=>navigator.serviceWorker.addEventListener('controllerchange',resolve,{once:true}));
   });
   const keys=await page.evaluate(()=>caches.keys());assert.ok(keys.includes('other-app-cache'));assert.ok(!keys.includes('phvd-old'));
-  const requests=await page.evaluate(async()=>{const c=await caches.open('phvd-v3-vi-ahw');return(await c.keys()).map(r=>r.url);});
+  const requests=await page.evaluate(async()=>{const name=(await caches.keys()).find(n=>n.startsWith('phvd-'));const c=await caches.open(name);return(await c.keys()).map(r=>r.url);});
   assert.ok(requests.some(r=>/\/assets\/index-.*\.js$/.test(r)));assert.ok(requests.some(r=>/\.css$/.test(r)));
   await context.setOffline(true);await page.reload();
   await page.getByRole('button',{name:'I understand and accept'}).click();

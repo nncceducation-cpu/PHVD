@@ -8,7 +8,7 @@
  *
  * Bump CACHE_VERSION on every deploy or clients will keep serving the old bundle.
  */
-const CACHE_VERSION = 'phvd-v3-vi-ahw';
+const CACHE_VERSION = 'phvd-v4-selected-plan';
 const scope = new URL('./', self.location.href);
 
 self.addEventListener('install', (event) => {

@@ -171,6 +171,40 @@ try {
       await page.locator('.xl\\:grid-cols-3').screenshot({path:'docs/test-artifacts/stratification.png'});
     } finally {await context.close();}
   });
+  await run('Selected management follows measurements; all zones remain at the end',async()=>{
+    const {context,page}=await open({viewport:{width:375,height:900}});
+    try {
+      const plan=page.locator('[data-current-management-zone]');
+      const reference=page.locator('[data-risk-zone-reference]');
+      for(const lang of ['en','fr','es','pt']) {
+        await page.locator(`nav [data-language=${lang}]`).click();
+        for(const [vi,ahw,zone] of [[9,3,'Green'],[11,7,'Yellow'],[15,11,'Red'],[9,3,'Green'],[11,3,'Unclassified']]) {
+          await fill(page,[28,vi,vi,ahw,ahw,.75]);
+          assert.equal(await plan.getAttribute('data-current-management-zone'),zone);
+          assert.equal(await plan.locator('.space-y-3 > div').count(),{Green:4,Yellow:6,Red:3,Unclassified:1}[zone]);
+          assert.equal(await reference.locator(':scope > div').count(),3);
+          if(lang==='en') {
+            const text=await plan.innerText();
+            assert.equal(text.includes('Observation in NICU'),zone==='Green');
+            assert.equal(text.includes('Referral to regional center'),zone==='Yellow');
+            assert.equal(text.includes('VP Shunt'),zone==='Red');
+          }
+        }
+        await fill(page,[28,9,9,3,3,.75]);
+        await page.getByRole('checkbox').first().focus();await page.keyboard.press('Space');
+        assert.equal(await plan.getAttribute('data-current-management-zone'),'Red');
+        await page.getByRole('checkbox').first().focus();await page.keyboard.press('Space');
+        assert.equal(await plan.getAttribute('data-current-management-zone'),'Green');
+      }
+      assert.ok(await page.evaluate(()=>{
+        const reference=document.querySelector('[data-risk-zone-reference]');
+        const graphs=[...document.querySelectorAll('main svg[role=img]')].filter(el=>!el.closest('[aria-hidden=true]'));
+        return [document.querySelector('[data-current-management-zone]'),...graphs].every(el=>!!(el.compareDocumentPosition(reference)&Node.DOCUMENT_POSITION_FOLLOWING));
+      }));
+      const layout=await page.evaluate(()=>[document.documentElement.clientWidth,document.documentElement.scrollWidth]);
+      assert.ok(layout[1]<=layout[0]+1);
+    }finally{await context.close();}
+  });
   await run('Assessment PNG export',async()=>{
     const {context,page,errors}=await open();
     try {

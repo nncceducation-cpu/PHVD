@@ -1,5 +1,6 @@
 // Updated VI/AHW-only interface strings: English key, French, Spanish, Portuguese.
 export const riskTranslations: Array<[string, string, string, string]> = [
+  ['All risk zones (reference)', 'Toutes les zones de risque (référence)', 'Todas las zonas de riesgo (referencia)', 'Todas as zonas de risco (referência)'],
   ['wks', 'sem', 'sem', 'sem'],
   ['Measurement added. Edit the fields for the next assessment.', 'Mesure ajoutée. Modifier les champs pour la prochaine évaluation.', 'Medida añadida. Modificar los campos para la siguiente evaluación.', 'Medida adicionada. Editar os campos para a próxima avaliação.'],
   ['Assessment incomplete or discordant', 'Évaluation incomplète ou discordante', 'Evaluación incompleta o discordante', 'Avaliação incompleta ou discordante'],

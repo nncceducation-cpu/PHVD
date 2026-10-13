@@ -428,6 +428,40 @@ const PHVD: React.FC = () => {
               <p className={`mt-2 text-xs ${imgMsg.ok ? 'text-emerald-600' : 'text-rose-600'}`}>{imgMsg.text}</p>
             )}
           </div>
+          {/* Current Action Plan */}
+          <div data-current-management-zone={currentRisk.zone} className={`p-6 rounded-xl shadow-sm border ${advice.color}`}>
+            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <ClipboardList className="text-blue-500" size={20} />
+              Management Plan
+            </h3>
+
+            {currentRisk.zone !== 'Unclassified' && <p className="font-bold mb-3">{`${currentRisk.zone} Zone`}</p>}
+
+            {currentRisk.reasons.length > 0 && (
+              <div className="mb-4 bg-slate-50 p-3 rounded-md border border-slate-100">
+                <div className="text-xs font-bold text-slate-500 uppercase mb-2">Triggers</div>
+                <ul className="list-disc ml-4 space-y-1 text-sm text-slate-700">
+                  {currentRisk.reasons.map((r, i) => (
+                    <li key={i}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {advice.actions.map((action, i) => (
+                <div
+                  key={i}
+                  className="flex items-start gap-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100"
+                >
+                  <div className="mt-1 min-w-[1.25rem] h-5 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 text-xs font-bold">
+                    {i + 1}
+                  </div>
+                  <span className="text-sm text-slate-700 font-medium">{action}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* RIGHT COLUMN: GRAPHS & RECS */}
@@ -472,7 +506,12 @@ const PHVD: React.FC = () => {
             <div className="h-64 w-full"><RiskGraph metric="AHW" measurements={[...measurements, { ...currentM, id: 'current' }]} /></div>
             <p className="mt-2 text-xs text-slate-500">AHW bands: green ≤ 6 mm, yellow &gt; 6–10 mm, red &gt; 10 mm. Overall classification uses combined VI/AHW criteria.</p>
           </div>
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 text-sm">
+        </div>
+      </div>
+
+      <section aria-label="All risk zones (reference)" className="space-y-4">
+        <h3 className="font-bold text-slate-800">All risk zones (reference)</h3>
+          <div data-risk-zone-reference className="grid grid-cols-1 xl:grid-cols-3 gap-3 text-sm">
             {(['Green', 'Yellow', 'Red'] as const).map((zone) => {
               const plan = getManagementAdvice(zone);
               return <div key={zone} className={`rounded-lg border p-4 ${plan.color}`}>
@@ -488,40 +527,7 @@ const PHVD: React.FC = () => {
             })}
           </div>
           <p className="text-xs text-slate-600">Changes in NIRS or Doppler RI may suggest impaired cerebral perfusion and a more urgent need for intervention. RI is recorded as additional information and does not automatically assign a zone.</p>
-          {/* Current Action Plan */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-              <ClipboardList className="text-blue-500" size={20} />
-              Management Plan
-            </h3>
-
-            {currentRisk.reasons.length > 0 && (
-              <div className="mb-4 bg-slate-50 p-3 rounded-md border border-slate-100">
-                <div className="text-xs font-bold text-slate-500 uppercase mb-2">Triggers</div>
-                <ul className="list-disc ml-4 space-y-1 text-sm text-slate-700">
-                  {currentRisk.reasons.map((r, i) => (
-                    <li key={i}>{r}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <div className="space-y-3">
-              {advice.actions.map((action, i) => (
-                <div
-                  key={i}
-                  className="flex items-start gap-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100"
-                >
-                  <div className="mt-1 min-w-[1.25rem] h-5 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 text-xs font-bold">
-                    {i + 1}
-                  </div>
-                  <span className="text-sm text-slate-700 font-medium">{action}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+      </section>
 
       {/* Off-screen printable report captured by "Save to Photos" */}
       <div
