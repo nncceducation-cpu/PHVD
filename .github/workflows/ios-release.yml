@@ -9,11 +9,11 @@ on:
       build_number:
         description: 'Build number (must be higher than the last upload)'
         required: true
-        default: '1'
+        default: '22'
       marketing_version:
         description: 'Marketing version (CFBundleShortVersionString, must be higher than any App Store version)'
         required: true
-        default: '1.2.0'
+        default: '1.6.1'
   push:
     tags: ['v*']
 
@@ -48,6 +48,10 @@ jobs:
         run: |
           npm ci
           npm run build
+          node scripts/test-accuracy.mjs
+          node scripts/test-risk.mjs
+          node scripts/test-history.mjs
+          node scripts/test-scan.mjs
 
       - name: Generate / sync the native iOS project
         run: |
@@ -92,7 +96,7 @@ jobs:
       - name: Set version and build number
         run: |
           BUILD_NO="${{ github.event.inputs.build_number || github.run_number }}"
-          MKT_VER="${{ github.event.inputs.marketing_version || '1.2.0' }}"
+          MKT_VER="${{ github.event.inputs.marketing_version || '1.6.1' }}"
           cd ios/App
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $MKT_VER" App/Info.plist || true
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NO" App/Info.plist || true
@@ -102,12 +106,13 @@ jobs:
           # uses the camera (ITMS-90683 otherwise rejects the upload).
           CAM_DESC="Used to photograph the ultrasound screen so measurements can be read automatically. Images are processed on-device and are not stored or shared."
           PHOTO_DESC="This app does not access your photo library; a description is required because the camera component references the photo library API."
+          PHOTO_ADD_DESC="Used to save PHVD assessment images to your Photos when you choose Save assessment to Photos. Images remain on your device."
           /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string $CAM_DESC" App/Info.plist \
             || /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription $CAM_DESC" App/Info.plist
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string $PHOTO_DESC" App/Info.plist \
             || /usr/libexec/PlistBuddy -c "Set :NSPhotoLibraryUsageDescription $PHOTO_DESC" App/Info.plist
-          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string $PHOTO_DESC" App/Info.plist \
-            || /usr/libexec/PlistBuddy -c "Set :NSPhotoLibraryAddUsageDescription $PHOTO_DESC" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string $PHOTO_ADD_DESC" App/Info.plist \
+            || /usr/libexec/PlistBuddy -c "Set :NSPhotoLibraryAddUsageDescription $PHOTO_ADD_DESC" App/Info.plist
           plutil -p App/Info.plist | grep -E 'CFBundle(Version|ShortVersionString)|NSCameraUsageDescription|NSPhotoLibrary'
 
       # --- Code signing -------------------------------------------------------

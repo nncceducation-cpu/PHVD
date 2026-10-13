@@ -13,6 +13,7 @@
  *   PT  IV, LCA (largura do corno anterior), DTO, IR, IPM
  */
 
+import { riskTranslations } from './risk-translations';
 type Lang = 'en' | 'fr' | 'es' | 'pt';
 
 const SUPPORTED: Lang[] = ['en', 'fr', 'es', 'pt'];
@@ -423,6 +424,12 @@ const dictionaries: Record<Exclude<Lang, 'en'>, Record<string, string>> = {
   },
 };
 
+for (const [english, fr, es, pt] of riskTranslations) {
+  dictionaries.fr[english] = fr;
+  dictionaries.es[english] = es;
+  dictionaries.pt[english] = pt;
+}
+
 /** Dynamic strings: the risk "Triggers" lines and the report's PMA cell. */
 const patterns: Record<Exclude<Lang, 'en'>, Array<[RegExp, (m: RegExpMatchArray) => string]>> = {
   fr: [
@@ -448,6 +455,13 @@ const patterns: Record<Exclude<Lang, 'en'>, Array<[RegExp, (m: RegExpMatchArray)
   ],
 };
 
+for (const lang of ['fr', 'es', 'pt'] as const) {
+  const ahw = lang === 'es' ? 'ACA' : 'LCA';
+  const conjunction = lang === 'fr' ? 'ET' : lang === 'es' ? 'Y' : 'E';
+  const centile = lang === 'fr' ? '97e centile' : 'percentil 97';
+  patterns[lang].unshift([/^VI \(([\d.]+)mm\) > 97th % (\+ 4 mm )?AND AHW \(([\d.]+)mm\) > (6|10) mm$/, m => `IV (${dec(m[1])} mm) > ${centile} ${m[2] || ''}${conjunction} ${ahw} (${dec(m[3])} mm) > ${m[4]} mm`]);
+}
+
 /** French, Spanish and Portuguese write decimals with a comma. */
 function dec(value: string): string {
   return value.replace('.', ',');
@@ -462,6 +476,8 @@ const contextRules: Array<{ text: string; within: string; value: Record<Exclude<
 ];
 
 const originals = new WeakMap<Node, string>();
+// Distinguish our translations from text React has updated since the last render.
+const renderedText = new WeakMap<Node, string>();
 const attrOriginals = new WeakMap<Element, Record<string, string>>();
 const TRANSLATED_ATTRS = ['placeholder', 'aria-label', 'title'];
 let language: Lang = 'en';
@@ -526,6 +542,7 @@ function applyToTextNode(node: Text): void {
     if (rule) next = original.replace(trimmed, rule.value[language as Exclude<Lang, 'en'>]);
   }
   if (node.nodeValue !== next) node.nodeValue = next;
+  renderedText.set(node, next);
 }
 
 function storedLanguage(): Lang | null {
@@ -746,7 +763,7 @@ function start(): void {
       if (record.type === 'characterData' && record.target.nodeType === Node.TEXT_NODE) {
         const node = record.target as Text;
         const value = node.nodeValue || '';
-        if (originals.get(node) !== value && lookup(value.trim()) !== null) {
+        if (renderedText.get(node) !== value) {
           originals.set(node, value);
           applyToTextNode(node);
         }

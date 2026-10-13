@@ -1,0 +1,13 @@
+{
+  "counts": {
+    "spreadsheet": 326,
+    "decimalGrid": 7620000,
+    "boundaries": 4572,
+    "laterality": 20574,
+    "invalid": 47,
+    "clinical": 32004,
+    "legacy": 21
+  },
+  "total": 7677544,
+  "maxReferenceError": 0
+}

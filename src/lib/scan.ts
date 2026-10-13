@@ -58,9 +58,8 @@ export function parseNumbers(text: string): DetectedNumber[] {
   // Match numbers optionally followed by cm/mm. A caliper list looks like
   // "1 d1 2.26 cm  2 d1 1.73 cm ..."; the leading "1 d1" index digits are bare
   // integers and are dropped, leaving the real "2.26 cm" values.
-  const re = /(\d{1,3}(?:[.,]\d{1,2})?)\s*(cm|mm)?/gi;
+  const re = /(?<![\w.,-])(\d+(?:[.,]\d+)?)\s*(cm|mm)\b/gi;
   const out: DetectedNumber[] = [];
-  const seen = new Set<string>();
   let m: RegExpExecArray | null;
   let i = 0;
   let seq = 0;
@@ -73,10 +72,8 @@ export function parseNumbers(text: string): DetectedNumber[] {
     // numbers 1,2,3,4 and probe/frame counts, which are unit-less integers).
     if (!unit) continue;
     if (value <= 0 || value > 99) continue;
-    const valueMm = unit === 'cm' ? Math.round(value * 100) / 10 : value; // cm->mm
+    const valueMm = unit === 'cm' ? Number((value * 10).toFixed(10)) : value;
     const raw = `${numStr} ${unit}`;
-    if (seen.has(raw)) continue;
-    seen.add(raw);
     seq += 1;
     out.push({ id: `n${i++}`, raw, value, valueMm, unit, kind: 'measure', seq });
   }

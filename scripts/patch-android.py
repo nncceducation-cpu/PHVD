@@ -31,8 +31,8 @@ TARGET_SDK = "36"
 AGP_VERSION = "8.9.1"
 GRADLE_VERSION = "8.11.1"
 
-VERSION_CODE = os.environ.get("ANDROID_VERSION_CODE", "8")
-VERSION_NAME = os.environ.get("ANDROID_VERSION_NAME", "1.6")
+VERSION_CODE = os.environ.get("ANDROID_VERSION_CODE", "9")
+VERSION_NAME = os.environ.get("ANDROID_VERSION_NAME", "1.6.1")
 
 failures = []
 

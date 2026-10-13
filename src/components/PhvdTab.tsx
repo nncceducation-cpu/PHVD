@@ -1,19 +1,3 @@
-/**
- * Ported from the PHVD tab of the "DRIVE IVH 2.0" Google AI Studio app
- * (components/PHVD.tsx, 561 lines).
- *
- * Two deliberate changes for the iOS build - both documented in README.md:
- *   1. The "Generate Clinical Report" button and its `generatePHVDReport` Gemini call
- *      are removed. An API key cannot be shipped inside an app bundle; it is trivially
- *      extractable. Removing it also lets the App Store privacy answer be a clean
- *      "Data Not Collected". To restore the feature, put a serverless proxy in front of
- *      Gemini and call that.
- *   2. The `stats_measurements` / `stats_updated` localStorage counters are dropped -
- *      they fed the parent app's dashboard, which does not exist in the standalone app.
- *
- * The clinical logic - getVIP97, getRiskZone, getManagementAdvice, RiskGraph - is
- * unchanged from the source.
- */
 import React, { useState, useEffect, useRef } from 'react';
 import {
   AlertTriangle,
@@ -33,81 +17,14 @@ import {
 import { captureAndDetect, isScanAvailable, type DetectedNumber } from '../lib/scan';
 import { saveElementToPhotos, downloadElementAsPng, isSaveToPhotosAvailable } from '../lib/exportImage';
 
-// -- Types & Interfaces --
-
-interface Measurement {
-  id: string;
-  date: string;
-  pma: number; // Post-menstrual age in weeks
-  viLeft: number;
-  viRight: number;
-  ahwLeft: number;
-  ahwRight: number;
-  todLeft: number;
-  todRight: number;
-  ri: number; // Resistive Index (recorded only; not part of the risk criteria)
-  clinical: {
-    hcGrowth: boolean; // >2cm/week
-    sutures: boolean; // separated
-    fontanelle: boolean; // bulging
-  };
-}
-
-type RiskZone = 'Green' | 'Yellow' | 'Red';
-
-// -- Constants & Helpers --
-
-// Linear approximation of Brouwer et al. (2012) VI 97th percentile
-// Formula derived from data points: 24w=9.3mm, 40w=13.8mm
-const getVIP97 = (pma: number) => 0.28 * pma + 2.6;
-
-const getRiskZone = (m: Measurement): { zone: RiskZone; reasons: string[] } => {
-  const maxVI = Math.max(m.viLeft, m.viRight);
-  const maxAHW = Math.max(m.ahwLeft, m.ahwRight);
-  const maxTOD = Math.max(m.todLeft, m.todRight);
-  const p97 = getVIP97(m.pma);
-  const p97plus4 = p97 + 4;
-
-  const reasons: string[] = [];
-
-  // -- RED ZONE CHECK (High Risk) --
-  // Criteria: VI > 97th+4mm OR AHW > 10mm OR TOD > 25mm OR Clinical Signs
-  const isRedVI = maxVI > p97plus4;
-  const isRedAHW = maxAHW > 10;
-  const isRedTOD = maxTOD > 25;
-  const hasClinicalSigns =
-    m.clinical.hcGrowth || m.clinical.sutures || m.clinical.fontanelle;
-
-  if (isRedVI || isRedAHW || isRedTOD || hasClinicalSigns) {
-    if (isRedVI) reasons.push(`VI (${maxVI.toFixed(1)}mm) > 97th% + 4mm`);
-    if (isRedAHW) reasons.push(`AHW (${maxAHW.toFixed(1)}mm) > 10mm`);
-    if (isRedTOD) reasons.push(`TOD (${maxTOD.toFixed(1)}mm) > 25mm`);
-    if (m.clinical.hcGrowth) reasons.push('Rapid HC Growth (>2cm/wk)');
-    if (m.clinical.sutures) reasons.push('Separated Sutures');
-    if (m.clinical.fontanelle) reasons.push('Bulging Fontanelle');
-    return { zone: 'Red', reasons };
-  }
-
-  // -- YELLOW ZONE CHECK (Moderate Risk) --
-  // Criteria: VI > 97th% AND (AHW > 6mm OR TOD > 25mm)
-  // We treat Yellow as VI > 97th AND AHW > 6mm (since AHW > 10 is red)
-  const isYellowVI = maxVI > p97;
-  const isYellowAHW = maxAHW > 6;
-
-  if (isYellowVI && isYellowAHW) {
-    reasons.push(`VI (${maxVI.toFixed(1)}mm) > 97th% AND AHW > 6mm`);
-    return { zone: 'Yellow', reasons };
-  }
-
-  // -- GREEN ZONE CHECK (Low Risk) --
-  return {
-    zone: 'Green',
-    reasons: ['Measurements within stable range', 'No clinical signs'],
-  };
-};
+import { getVIP97, getRiskZone, type RiskZone } from '../lib/risk';
+import NumericInput from './NumericInput';
+import { readHistory, measurementError, localDate, type Measurement } from '../lib/history';
 
 const getManagementAdvice = (zone: RiskZone) => {
   switch (zone) {
+    case 'Unclassified':
+      return { title: 'Assessment incomplete or discordant', actions: ['Confirm VI and AHW measurements and review with the clinical team.'], color: 'bg-slate-100 border-slate-300 text-slate-800' };
     case 'Green':
       return {
         title: 'Low Risk - Observation',
@@ -126,6 +43,7 @@ const getManagementAdvice = (zone: RiskZone) => {
           'Referral to regional center for neurosurgical review',
           'Consider LP 2-3 times (remove 10ml/kg)',
           'Cranial US 2-3x a week until stable for 2 weeks',
+          'Then every 1-2 weeks till 34 weeks PMA',
           'Neurosurgical intervention if no stabilization occurs',
           'MRI at Term Equivalent',
         ],
@@ -145,17 +63,19 @@ const getManagementAdvice = (zone: RiskZone) => {
 };
 
 const PHVD: React.FC = () => {
-  const [measurements, setMeasurements] = useState<Measurement[]>([]);
+  const [loaded] = useState(readHistory);
+  const [measurements, setMeasurements] = useState<Measurement[]>(loaded.measurements);
+  const [storageMsg, setStorageMsg] = useState<string | null>(loaded.message);
+  const [historyChanged, setHistoryChanged] = useState(false);
+  const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const [currentM, setCurrentM] = useState<Measurement>({
     id: '',
-    date: new Date().toISOString().split('T')[0],
+    date: localDate(),
     pma: 28,
     viLeft: 0,
     viRight: 0,
     ahwLeft: 0,
     ahwRight: 0,
-    todLeft: 0,
-    todRight: 0,
     ri: 0,
     clinical: { hcGrowth: false, sutures: false, fontanelle: false },
   });
@@ -198,42 +118,26 @@ const PHVD: React.FC = () => {
     return true;
   };
 
-  // Load from local storage
+  // Do not overwrite stored data during startup or after a failed read.
   useEffect(() => {
-    const saved = localStorage.getItem('phvd_data');
-    if (saved) {
-      try {
-        setMeasurements(JSON.parse(saved));
-      } catch (e) {
-        console.error(e);
-      }
+    if (!historyChanged) return;
+    try {
+      localStorage.setItem('phvd_data', JSON.stringify(measurements));
+      setStorageMsg(null);
+    } catch {
+      setStorageMsg('History could not be saved on this device. Keep the page open or download the assessment image.');
     }
-  }, []);
-
-  // Save to local storage
-  useEffect(() => {
-    localStorage.setItem('phvd_data', JSON.stringify(measurements));
-  }, [measurements]);
+  }, [measurements, historyChanged]);
 
   const addMeasurement = () => {
-    if (currentM.pma < 24 || currentM.pma > 42) {
-      alert('PMA must be between 24 and 42 weeks');
-      return;
-    }
-    const newEntry = { ...currentM, id: Date.now().toString() };
-    setMeasurements([...measurements, newEntry].sort((a, b) => a.pma - b.pma));
-    // Reset inputs slightly but keep PMA/Date handy
-    setCurrentM({
-      ...currentM,
-      viLeft: 0,
-      viRight: 0,
-      ahwLeft: 0,
-      ahwRight: 0,
-      todLeft: 0,
-      todRight: 0,
-      ri: 0,
-      clinical: { hcGrowth: false, sutures: false, fontanelle: false },
-    });
+    const error = measurementError(currentM);
+    if (error) { alert(error); return; }
+    if (savedSignature === JSON.stringify(currentM)) return;
+    setHistoryChanged(true);
+    const newEntry = { ...currentM, id: crypto.randomUUID() };
+    setMeasurements((previous) => [...previous, newEntry].sort((a, b) => a.pma - b.pma || a.date.localeCompare(b.date)));
+    // Retain the assessment so downloading immediately after Save exports it.
+    setSavedSignature(JSON.stringify(currentM));
   };
 
   const currentRisk = getRiskZone(currentM);
@@ -267,6 +171,7 @@ const PHVD: React.FC = () => {
 
   return (
     <div className="space-y-8 pb-10">
+      {storageMsg && <p role="status" className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">{storageMsg}</p>}
       {/* Header Info */}
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-6 items-start">
         <div className="flex-1">
@@ -276,8 +181,9 @@ const PHVD: React.FC = () => {
           </h2>
           <p className="text-slate-600 mt-2 text-sm leading-relaxed">
             This module implements the risk stratification and management framework proposed
-            by El-Dib et al. (2020). Enter ventricular measurements (VI, AHW, TOD) to
-            calculate the risk zone.
+            by El-Dib et al. (2020). Enter ventricular measurements (VI and AHW) to
+            calculate the risk zone. TOD is excluded from this version; the full paper also uses TOD.
+            The VI 97th % curve uses the exact polynomial in the authors’ supplementary calculators.
           </p>
         </div>
         <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 text-xs text-slate-500 w-full md:w-64">
@@ -290,9 +196,6 @@ const PHVD: React.FC = () => {
             </li>
             <li>
               <strong>AHW:</strong> Anterior Horn Width
-            </li>
-            <li>
-              <strong>TOD:</strong> Thalamo-Occipital Distance
             </li>
             <li>
               <strong>RI:</strong> Resistive Index (recorded only)
@@ -372,9 +275,10 @@ const PHVD: React.FC = () => {
             {/* Date & Age */}
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Date</label>
+                <label htmlFor="assessment-date" className="block text-xs font-bold text-slate-500 mb-1">Date</label>
                 <input
                   type="date"
+                  id="assessment-date"
                   value={currentM.date}
                   onChange={(e) => setCurrentM({ ...currentM, date: e.target.value })}
                   className="w-full p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
@@ -384,20 +288,19 @@ const PHVD: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-500 mb-1">
                   PMA (Weeks)
                 </label>
-                <input
-                  type="number"
+                <NumericInput
                   value={currentM.pma}
-                  onChange={(e) =>
-                    setCurrentM({ ...currentM, pma: parseFloat(e.target.value) })
-                  }
+                  onValueChange={(pma) => setCurrentM({ ...currentM, pma })}
                   min={24}
                   max={42}
-                  step={0.1}
+                  step="any"
+                  aria-label="PMA in decimal weeks"
                   className="w-full p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
             </div>
 
+            <p className="text-xs text-slate-500 mb-4">Enter age in decimal weeks: 28 weeks + 6 days = 28.857 weeks.</p>
             {/* Measurements Grid */}
             <div className="mb-6">
               <div className="grid grid-cols-3 gap-x-4 gap-y-2 mb-2">
@@ -427,26 +330,16 @@ const PHVD: React.FC = () => {
                   pickL={() => consumeChip((v) => setCurrentM((m) => ({ ...m, ahwLeft: v })), 'mm')}
                   pickR={() => consumeChip((v) => setCurrentM((m) => ({ ...m, ahwRight: v })), 'mm')}
                 />
-                <MeasurementRow
-                  label="TOD"
-                  valL={currentM.todLeft}
-                  valR={currentM.todRight}
-                  setL={(v) => setCurrentM((m) => ({ ...m, todLeft: v }))}
-                  setR={(v) => setCurrentM((m) => ({ ...m, todRight: v }))}
-                  armed={!!activeChip}
-                  pickL={() => consumeChip((v) => setCurrentM((m) => ({ ...m, todLeft: v })), 'mm')}
-                  pickR={() => consumeChip((v) => setCurrentM((m) => ({ ...m, todRight: v })), 'mm')}
-                />
-
                 {/* RI — single value, recorded only */}
                 <div className="grid grid-cols-3 gap-4 items-center pt-1">
                   <div className="font-bold text-sm text-slate-700">RI</div>
-                  <input
-                    type="number"
+                  <NumericInput
+                    optional
                     step="0.01"
                     min="0"
                     max="1.5"
-                    value={currentM.ri || ''}
+                    aria-label="Resistive Index (optional)"
+                    value={currentM.ri}
                     onClick={(e) => {
                       if (activeChip) {
                         e.preventDefault();
@@ -454,7 +347,7 @@ const PHVD: React.FC = () => {
                         (e.target as HTMLInputElement).blur();
                       }
                     }}
-                    onChange={(e) => setCurrentM((m) => ({ ...m, ri: parseFloat(e.target.value) }))}
+                    onValueChange={(ri) => setCurrentM((m) => ({ ...m, ri }))}
                     className={`col-span-2 w-full p-2 text-center border rounded outline-none text-sm font-mono ${
                       activeChip ? 'border-blue-400 ring-2 ring-blue-200 bg-blue-50/40' : 'border-slate-300 focus:border-blue-500'
                     }`}
@@ -505,6 +398,7 @@ const PHVD: React.FC = () => {
 
             {/* Live Risk Preview */}
             <div
+              data-risk-zone={currentRisk.zone}
               className={`p-4 rounded-lg mb-4 border ${advice.color} flex items-center justify-between`}
             >
               <div className="font-bold">{advice.title}</div>
@@ -515,10 +409,12 @@ const PHVD: React.FC = () => {
 
             <button
               onClick={addMeasurement}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors mb-3"
+              disabled={savedSignature === JSON.stringify(currentM)}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors mb-3"
             >
               <Save size={18} /> Save Measurement
             </button>
+            {savedSignature === JSON.stringify(currentM) && <p role="status" className="mb-3 text-xs text-slate-600">Measurement added. Edit the fields for the next assessment.</p>}
 
             <button
               onClick={saveImage}
@@ -544,7 +440,7 @@ const PHVD: React.FC = () => {
                 Ventricular Index Trend
               </h3>
               <button
-                onClick={() => setMeasurements([])}
+                onClick={() => { setHistoryChanged(true); setSavedSignature(null); setMeasurements([]); }}
                 className="text-xs text-slate-400 hover:text-red-500 flex items-center gap-1"
               >
                 <Trash2 size={12} /> Clear History
@@ -554,14 +450,15 @@ const PHVD: React.FC = () => {
             <div className="h-64 w-full">
               <RiskGraph measurements={[...measurements, { ...currentM, id: 'current' }]} />
             </div>
-            <div className="mt-4 flex justify-center gap-6 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-slate-500">Graph colors show VI measurement bands only. The overall zone also requires AHW and clinical signs.</p>
+            <div className="mt-4 flex flex-wrap justify-center gap-3 text-xs text-slate-500">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-0.5 bg-slate-300"></div>
-                <span>P97 (Brouwer)</span>
+                <span>VI 97th %</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-0.5 bg-red-300"></div>
-                <span>P97 + 4mm</span>
+                <span>VI 97th % + 4 mm</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-blue-500"></div>
@@ -570,6 +467,27 @@ const PHVD: React.FC = () => {
             </div>
           </div>
 
+          <div className="bg-white p-6 rounded-xl border border-slate-200">
+            <h3 className="font-bold text-slate-800 mb-4">Anterior Horn Width Trend</h3>
+            <div className="h-64 w-full"><RiskGraph metric="AHW" measurements={[...measurements, { ...currentM, id: 'current' }]} /></div>
+            <p className="mt-2 text-xs text-slate-500">AHW bands: green ≤ 6 mm, yellow &gt; 6–10 mm, red &gt; 10 mm. Overall classification uses combined VI/AHW criteria.</p>
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 text-sm">
+            {(['Green', 'Yellow', 'Red'] as const).map((zone) => {
+              const plan = getManagementAdvice(zone);
+              return <div key={zone} className={`rounded-lg border p-4 ${plan.color}`}>
+                <h3 className="text-lg font-bold underline mb-3">{`${zone} Zone`}</h3>
+                <h4 className="font-bold mb-1">Key Criteria:</h4>
+                <p>{zone === 'Green' ? 'VI ≤ 97th % AND AHW ≤ 6 mm' : zone === 'Yellow' ? 'VI > 97th % AND AHW > 6 mm' : 'VI > 97th % + 4 mm AND AHW > 10 mm'}</p>
+                <p className="mt-3 font-semibold">{zone === 'Red' ? 'OR any listed clinical sign:' : 'AND absence of all listed clinical signs:'}</p>
+                <ul className="list-disc ml-4 mt-1"><li>HC Growth &gt; 2 cm/week</li><li>Separated Sutures</li><li>Bulging Fontanelle</li></ul>
+                {zone === 'Yellow' && <p className="mt-2 text-xs">Red criteria take priority.</p>}
+                <h4 className="font-bold mt-4 mb-1">Management:</h4>
+                <ul className="list-disc ml-4 space-y-2">{plan.actions.map(action => <li key={action}>{action}</li>)}</ul>
+              </div>;
+            })}
+          </div>
+          <p className="text-xs text-slate-600">Changes in NIRS or Doppler RI may suggest impaired cerebral perfusion and a more urgent need for intervention. RI is recorded as additional information and does not automatically assign a zone.</p>
           {/* Current Action Plan */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
             <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
@@ -615,7 +533,7 @@ const PHVD: React.FC = () => {
             <LineChart className="text-blue-600" size={22} />
             <div>
               <div className="text-lg font-bold text-slate-800 leading-tight">PHVD Risk Assessment</div>
-              <div className="text-[11px] text-slate-500">El-Dib et al. (2020) framework</div>
+              <div className="text-[11px] text-slate-500">El-Dib et al. (2020) framework — VI/AHW only; TOD excluded</div>
             </div>
           </div>
 
@@ -635,7 +553,6 @@ const PHVD: React.FC = () => {
             <tbody className="font-mono text-slate-800">
               <tr><td className="p-2 border border-slate-200 font-sans font-bold">VI</td><td className="p-2 border border-slate-200 text-center">{currentM.viLeft || '—'}</td><td className="p-2 border border-slate-200 text-center">{currentM.viRight || '—'}</td></tr>
               <tr><td className="p-2 border border-slate-200 font-sans font-bold">AHW</td><td className="p-2 border border-slate-200 text-center">{currentM.ahwLeft || '—'}</td><td className="p-2 border border-slate-200 text-center">{currentM.ahwRight || '—'}</td></tr>
-              <tr><td className="p-2 border border-slate-200 font-sans font-bold">TOD</td><td className="p-2 border border-slate-200 text-center">{currentM.todLeft || '—'}</td><td className="p-2 border border-slate-200 text-center">{currentM.todRight || '—'}</td></tr>
               <tr><td className="p-2 border border-slate-200 font-sans font-bold">RI</td><td className="p-2 border border-slate-200 text-center" colSpan={2}>{currentM.ri || '—'}</td></tr>
             </tbody>
           </table>
@@ -688,27 +605,27 @@ const MeasurementRow: React.FC<{
   return (
     <div className="grid grid-cols-3 gap-4 items-center">
       <div className="font-bold text-sm text-slate-700">{label}</div>
-      <input
-        type="number"
+      <NumericInput
+        aria-label={`${label} left in mm`}
         step="0.1"
         min="0"
-        value={valL || ''}
+        value={valL}
         onClick={(e) => {
           if (armed && pickL) { e.preventDefault(); pickL(); (e.target as HTMLInputElement).blur(); }
         }}
-        onChange={(e) => setL(parseFloat(e.target.value))}
+        onValueChange={setL}
         className={cls('')}
         placeholder="L"
       />
-      <input
-        type="number"
+      <NumericInput
+        aria-label={`${label} right in mm`}
         step="0.1"
         min="0"
-        value={valR || ''}
+        value={valR}
         onClick={(e) => {
           if (armed && pickR) { e.preventDefault(); pickR(); (e.target as HTMLInputElement).blur(); }
         }}
-        onChange={(e) => setR(parseFloat(e.target.value))}
+        onValueChange={setR}
         className={cls('')}
         placeholder="R"
       />
@@ -721,7 +638,7 @@ const Checkbox: React.FC<{
   checked: boolean;
   onChange: (c: boolean) => void;
 }> = ({ label, checked, onChange }) => (
-  <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded transition-colors">
+  <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded transition-colors focus-within:ring-2 focus-within:ring-blue-500">
     <div
       className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
         checked ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'
@@ -732,7 +649,7 @@ const Checkbox: React.FC<{
     <span className="text-sm font-medium text-slate-700">{label}</span>
     <input
       type="checkbox"
-      className="hidden"
+      className="sr-only"
       checked={checked}
       onChange={(e) => onChange(e.target.checked)}
     />
@@ -740,7 +657,7 @@ const Checkbox: React.FC<{
 );
 
 // SVG Graph Component
-const RiskGraph: React.FC<{ measurements: Measurement[] }> = ({ measurements }) => {
+const RiskGraph: React.FC<{ measurements: Measurement[]; metric?: 'VI' | 'AHW' }> = ({ measurements, metric = 'VI' }) => {
   // Config
   const width = 100;
   const height = 100;
@@ -749,7 +666,11 @@ const RiskGraph: React.FC<{ measurements: Measurement[] }> = ({ measurements }) 
   const minPMA = 24;
   const maxPMA = 42;
   const minVI = 0;
-  const maxVI = 25; // y-axis max
+  const plotMeasurements = measurements.filter(m => Number.isFinite(m.pma) && m.pma >= 24 && m.pma <= 42 && (metric === 'VI' ? [m.viLeft, m.viRight] : [m.ahwLeft, m.ahwRight]).every(v => Number.isFinite(v) && v > 0)).sort((a,b) => a.pma - b.pma || a.date.localeCompare(b.date));
+  const maxValue = plotMeasurements.reduce((max,m) => Math.max(max, ...(metric === 'VI' ? [m.viLeft,m.viRight] : [m.ahwLeft,m.ahwRight])), 0);
+  const maxVI = Math.max(metric === 'VI' ? 25 : 16, Math.ceil(maxValue / 5) * 5);
+  const reference = (pma: number) => metric === 'VI' ? getVIP97(pma) : 6;
+  const upper = (pma: number) => metric === 'VI' ? getVIP97(pma) + 4 : 10;
 
   // Scales
   const scaleX = (pma: number) =>
@@ -760,39 +681,46 @@ const RiskGraph: React.FC<{ measurements: Measurement[] }> = ({ measurements }) 
   // Generate Reference Lines
   const p97Points: string[] = [];
   const p97Plus4Points: string[] = [];
-  for (let p = minPMA; p <= maxPMA; p += 1) {
-    const val = getVIP97(p);
+  for (let day = 0; day <= (maxPMA - minPMA) * 7; day++) {
+    const p = minPMA + day / 7;
+    const val = reference(p);
     p97Points.push(`${scaleX(p)},${scaleY(val)}`);
-    p97Plus4Points.push(`${scaleX(p)},${scaleY(val + 4)}`);
+    p97Plus4Points.push(`${scaleX(p)},${scaleY(upper(p))}`);
   }
 
   // User Data Points
-  const userPoints = measurements
-    .filter((m) => m.viLeft > 0 || m.viRight > 0)
+  const userPoints = plotMeasurements
     .map((m) => ({
       x: scaleX(m.pma),
-      y: scaleY(Math.max(m.viLeft, m.viRight)),
+      y: scaleY(metric === 'VI' ? Math.max(m.viLeft, m.viRight) : Math.max(m.ahwLeft, m.ahwRight)),
       id: m.id,
     }));
 
   return (
     <svg
+      role="img"
+      aria-label={`${metric} measurement trend`}
       viewBox={`0 0 ${width} ${height}`}
       className="w-full h-full bg-slate-50 border border-slate-100 rounded-lg"
     >
+      {/* VI bands only; overall assessment also requires AHW and clinical signs. */}
+      <polygon points={`${padX},${scaleY(0)} ${width-padX},${scaleY(0)} ${[...p97Points].reverse().join(' ')}`} fill="#d1fae5" />
+      <polygon points={`${p97Points.join(' ')} ${[...p97Plus4Points].reverse().join(' ')}`} fill="#fef3c7" />
+      <polygon points={`${padX},${padY} ${width-padX},${padY} ${[...p97Plus4Points].reverse().join(' ')}`} fill="#ffe4e6" />
       {/* Grid Lines */}
       {Array.from({ length: 5 }).map((_, i) => (
         <line
           key={i}
           x1={padX}
-          y1={scaleY(i * 5)}
+          y1={scaleY(i * maxVI / 4)}
           x2={width - padX}
-          y2={scaleY(i * 5)}
+          y2={scaleY(i * maxVI / 4)}
           stroke="#e2e8f0"
           strokeWidth="0.5"
         />
       ))}
 
+      {Array.from({length: 5}, (_,i) => <text key={i} x={padX - 1} y={scaleY(i * maxVI / 4) + 1} fontSize="2.5" textAnchor="end" fill="#64748b">{(i * maxVI / 4).toFixed(1)}</text>)}
       {/* Reference Curves */}
       <polyline
         points={p97Points.join(' ')}
@@ -811,21 +739,21 @@ const RiskGraph: React.FC<{ measurements: Measurement[] }> = ({ measurements }) 
 
       <text
         x={width - padX - 5}
-        y={scaleY(getVIP97(41))}
+        y={scaleY(reference(41))}
         fontSize="3"
         fill="#64748b"
         textAnchor="end"
       >
-        97th%
+        {metric === 'VI' ? '97th %' : '6 mm'}
       </text>
       <text
         x={width - padX - 5}
-        y={scaleY(getVIP97(41) + 4)}
+        y={scaleY(upper(41))}
         fontSize="3"
         fill="#f87171"
         textAnchor="end"
       >
-        +4mm
+        {metric === 'VI' ? '+4 mm' : '10 mm'}
       </text>
 
       {/* Axis Labels */}
@@ -840,7 +768,7 @@ const RiskGraph: React.FC<{ measurements: Measurement[] }> = ({ measurements }) 
         fill="#64748b"
         transform={`rotate(-90, 3, ${height / 2})`}
       >
-        Ventricular Index (mm)
+        {metric === 'VI' ? 'Ventricular Index (mm)' : 'Anterior Horn Width (mm)'}
       </text>
 
       {/* X-Axis Ticks */}

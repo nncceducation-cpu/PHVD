@@ -6,11 +6,11 @@ on:
       version_code:
         description: "Version code (integer, must be higher than the last Play upload)"
         required: true
-        default: "8"
+        default: "9"
       version_name:
         description: "Version name shown to users"
         required: true
-        default: "1.6"
+        default: "1.6.1"
 
 jobs:
   build:
@@ -35,7 +35,12 @@ jobs:
         run: npm ci
 
       - name: Build the web bundle
-        run: npm run build
+        run: |
+          npm run build
+          node scripts/test-accuracy.mjs
+          node scripts/test-risk.mjs
+          node scripts/test-history.mjs
+          node scripts/test-scan.mjs
 
       - name: Generate the native Android project
         run: |

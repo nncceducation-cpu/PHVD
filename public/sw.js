@@ -8,12 +8,24 @@
  *
  * Bump CACHE_VERSION on every deploy or clients will keep serving the old bundle.
  */
-const CACHE_VERSION = 'phvd-v2';
+const CACHE_VERSION = 'phvd-v3-vi-ahw';
+const scope = new URL('./', self.location.href);
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => cache.addAll(['./', './index.html']))
+    caches.open(CACHE_VERSION).then(async (cache) => {
+      // Cache the first-load bundle as well as HTML, before offline use is promised.
+      const index = new URL('./index.html', scope).href;
+      const response = await fetch(index, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Unable to cache PHVD shell');
+      const html = await response.clone().text();
+      await cache.put(index, response);
+      const assets = [...html.matchAll(/(?:src|href)="([^"#]+)"/g)]
+        .map(match => new URL(match[1], scope))
+        .filter(url => url.origin === scope.origin && url.pathname.startsWith(scope.pathname));
+      await cache.addAll(assets.map(url => url.href));
+    })
   );
 });
 
@@ -22,7 +34,7 @@ self.addEventListener('activate', (event) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k)))
+        Promise.all(keys.filter((k) => k.startsWith('phvd-') && k !== CACHE_VERSION).map((k) => caches.delete(k)))
       )
       .then(() => self.clients.claim())
   );
@@ -32,15 +44,21 @@ self.addEventListener('activate', (event) => {
 // fully usable when it isn't.
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  if (url.origin !== scope.origin || !url.pathname.startsWith(scope.pathname)) return;
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, copy));
+        if (response.ok) {
+          const copy = response.clone();
+          event.waitUntil(caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, copy)));
+        }
         return response;
       })
       .catch(() =>
-        caches.match(event.request).then((hit) => hit || caches.match('./index.html'))
+        caches.match(event.request).then(async (hit) => hit ||
+          (event.request.mode === 'navigate' ? await caches.match(new URL('./index.html', scope).href) : null) ||
+          new Response('Unavailable offline', { status: 503 }))
       )
   );
 });

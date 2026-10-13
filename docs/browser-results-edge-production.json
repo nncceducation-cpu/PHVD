@@ -1,0 +1,86 @@
+[
+  {
+    "name": "Malformed history null",
+    "status": "PASS"
+  },
+  {
+    "name": "Malformed history {}",
+    "status": "PASS"
+  },
+  {
+    "name": "Malformed history 42",
+    "status": "PASS"
+  },
+  {
+    "name": "Malformed history \"data\"",
+    "status": "PASS"
+  },
+  {
+    "name": "Malformed history [null]",
+    "status": "PASS"
+  },
+  {
+    "name": "Malformed history [{\"pma\":28}]",
+    "status": "PASS"
+  },
+  {
+    "name": "Malformed history {broken",
+    "status": "PASS"
+  },
+  {
+    "name": "Storage read failure",
+    "status": "PASS"
+  },
+  {
+    "name": "Storage write failure",
+    "status": "PASS"
+  },
+  {
+    "name": "Persistence, mixed legacy rows, clear and reload",
+    "status": "PASS"
+  },
+  {
+    "name": "Local date near UTC midnight",
+    "status": "PASS"
+  },
+  {
+    "name": "Cleared PMA field has no React NaN warnings",
+    "status": "PASS"
+  },
+  {
+    "name": "Invalid values cannot be saved",
+    "status": "PASS"
+  },
+  {
+    "name": "Clinical signs override normal measurements and keyboard access",
+    "status": "PASS"
+  },
+  {
+    "name": "Multilingual decimal-comma entry and invalid numeric text",
+    "status": "PASS"
+  },
+  {
+    "name": "Layout and graphs 320px",
+    "status": "PASS"
+  },
+  {
+    "name": "Layout and graphs 375px",
+    "status": "PASS"
+  },
+  {
+    "name": "Layout and graphs 768px",
+    "status": "PASS"
+  },
+  {
+    "name": "Layout and graphs 1200px",
+    "status": "PASS"
+  },
+  {
+    "name": "Risk labels change through all zones in each language",
+    "status": "PASS"
+  },
+  {
+    "name": "Assessment PNG export",
+    "status": "PASS"
+  }
+]

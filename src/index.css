@@ -19,7 +19,7 @@ body {
 }
 
 /* Stop iOS zooming the page when a number field is focused */
-input[type='number'],
+input[data-numeric-input],
 input[type='date'] {
   font-size: 16px;
 }
