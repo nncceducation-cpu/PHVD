@@ -7,7 +7,7 @@ test_apk=$(find out -maxdepth 1 -name '*-test.apk')
 test -f "$apk"
 test -f "$test_apk"
 adb install -r "$apk"
-adb install -r "$test_apk"
+adb install -r -t "$test_apk"
 # Permission grants are restricted to the disposable emulator. Real-device
 # camera capture and the interactive permission dialogs still need device QA.
 for permission in CAMERA READ_EXTERNAL_STORAGE WRITE_EXTERNAL_STORAGE READ_MEDIA_IMAGES READ_MEDIA_VIDEO; do

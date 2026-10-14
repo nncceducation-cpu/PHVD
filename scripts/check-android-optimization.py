@@ -20,6 +20,7 @@ with zipfile.ZipFile(aab) as bundle:
     assert dex_bytes < 11471028, "R8 did not reduce DEX size compared with build 10"
     assets = {name: hashlib.sha256(bundle.read(name)).hexdigest() for name in bundle.namelist()
               if name.startswith("base/assets/public/assets/") and name.endswith(".js")}
+    assert "0bc054c43e94e0f844abe427f2348feba6787617b2c8e0068d65c6e314129ebe" in assets.values(), "Calculator bundle changed from tested build 10"
 report = {"r8": metadata, "dexBytes": dex_bytes, "build10DexBytes": 11471028,
           "mappedClassObfuscationPercent": round(renamed / len(classes) * 100, 2),
           "mappedClasses": len(classes), "renamedClasses": renamed, "webAssetSha256": assets}
