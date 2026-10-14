@@ -16,7 +16,9 @@ with tempfile.TemporaryDirectory(prefix="android-patch-test-", dir=root) as temp
             target = android / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(template.extractfile(name).read())
-    env = {**os.environ, "ANDROID_PROJECT_DIR": str(android), "ANDROID_VERSION_CODE": "11", "ANDROID_VERSION_NAME": "1.6.2"}
+    ocr = android / "ocr-build.gradle"
+    ocr.write_bytes((root / "node_modules/@pantrist/capacitor-plugin-ml-kit-text-recognition/android/build.gradle").read_bytes())
+    env = {**os.environ, "ANDROID_PROJECT_DIR": str(android), "ANDROID_OCR_GRADLE": str(ocr), "ANDROID_VERSION_CODE": "11", "ANDROID_VERSION_NAME": "1.6.2"}
     subprocess.run([sys.executable, str(root / "scripts/patch-android.py")], env=env, check=True, capture_output=True)
     first = {p.relative_to(android): p.read_bytes() for p in android.rglob("*") if p.is_file()}
     subprocess.run([sys.executable, str(root / "scripts/patch-android.py")], env=env, check=True, capture_output=True)

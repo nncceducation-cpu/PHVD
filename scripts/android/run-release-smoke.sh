@@ -14,6 +14,9 @@ adb install -r -t "$test_apk"
 for permission in CAMERA READ_EXTERNAL_STORAGE WRITE_EXTERNAL_STORAGE READ_MEDIA_IMAGES READ_MEDIA_VIDEO; do
   adb shell pm grant "$app" "android.permission.$permission" 2>/dev/null || true
 done
+# Validate first-use OCR without a background model download.
+adb shell svc wifi disable
+adb shell svc data disable
 adb logcat -c
 adb shell dumpsys package "$app" > smoke-results/package-before-start.txt
 adb shell am start -W -n "$app/.MainActivity"

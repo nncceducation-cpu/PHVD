@@ -27,6 +27,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 ANDROID = Path(os.environ.get("ANDROID_PROJECT_DIR", ROOT / "android"))
+OCR_GRADLE = Path(os.environ.get("ANDROID_OCR_GRADLE", ROOT / "node_modules/@pantrist/capacitor-plugin-ml-kit-text-recognition/android/build.gradle"))
 
 MIN_SDK = "24"  # Required by this app's existing Play automatic protection.
 TARGET_SDK = "36"
@@ -122,6 +123,13 @@ def app_gradle(t: str) -> str:
 
 edit(ANDROID / "app/build.gradle", app_gradle)
 
+# Bundle the Latin OCR model so a fresh/offline install can recognize text
+# immediately, without a separate Google Play Services model download.
+edit(OCR_GRADLE, lambda t: re.sub(
+    r'implementation "com\.google\.android\.gms:play-services-mlkit-text-recognition:[^"]+"',
+    'implementation "com.google.mlkit:text-recognition:16.0.1"', t,
+))
+
 # The JavaScript bridge must retain its annotated entry points. Plugin classes,
 # constructors, methods and callbacks are kept by Capacitor's consumer rules.
 edit(ANDROID / "app/proguard-rules.pro", lambda _: (ROOT / "scripts/android/proguard-rules.pro").read_text(encoding="utf-8"))
@@ -154,6 +162,7 @@ edit(ANDROID / "app/src/main/AndroidManifest.xml", manifest)
 # -- verify, loudly. A silently-unsigned release build is the failure mode that
 #    wastes an afternoon, so assert rather than hope.
 checks = {
+    OCR_GRADLE: ['implementation "com.google.mlkit:text-recognition:16.0.1"'],
     ANDROID / "variables.gradle": [
         f"minSdkVersion = {MIN_SDK}",
         f"targetSdkVersion = {TARGET_SDK}",

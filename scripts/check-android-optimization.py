@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import re
 import sys
+import struct
 import zipfile
 
 aab = Path(sys.argv[1])
@@ -26,8 +27,20 @@ with zipfile.ZipFile(aab) as bundle:
     assets = {name: hashlib.sha256(bundle.read(name)).hexdigest() for name in bundle.namelist()
               if name.startswith("base/assets/public/assets/") and name.endswith(".js")}
     assert "0bc054c43e94e0f844abe427f2348feba6787617b2c8e0068d65c6e314129ebe" in assets.values(), "Calculator bundle changed from tested build 10"
+    native_alignments = {}
+    for name in bundle.namelist():
+        if name.endswith(".so") and any(abi in name for abi in ["/arm64-v8a/", "/x86_64/"]):
+            elf = bundle.read(name)
+            assert elf[:5] == b"\x7fELF\x02" and elf[5] == 1, f"Unexpected native ELF format: {name}"
+            phoff = struct.unpack_from("<Q", elf, 32)[0]
+            phsize, phnum = struct.unpack_from("<HH", elf, 54)
+            alignments = [struct.unpack_from("<Q", elf, phoff + i * phsize + 48)[0]
+                          for i in range(phnum) if struct.unpack_from("<I", elf, phoff + i * phsize)[0] == 1]
+            assert alignments and min(alignments) >= 16384, f"Native library lacks 16 KB page alignment: {name}"
+            native_alignments[name] = alignments
 report = {"r8": metadata, "dexBytes": dex_bytes, "build10DexBytes": 11471028,
           "vitalsScoresFromR8Metadata": vitals_scores,
+          "native64BitLoadSegmentAlignments": native_alignments,
           "mappedClassObfuscationPercent": round(renamed / len(classes) * 100, 2),
           "mappedClasses": len(classes), "renamedClasses": renamed, "webAssetSha256": assets}
 # Mapping-based percentage is a separate diagnostic, not the Android vitals score.

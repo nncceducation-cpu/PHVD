@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.Instrumentation;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -14,6 +15,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.WebView;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -152,6 +154,11 @@ public class ReleaseSmokeInstrumentation extends Instrumentation {
             .put("fileName", "release-bridge-test");
         JSONObject saved = nativeCall("Media", "savePhoto", options.toString());
         assertTrue(saved.toString(), saved.getString("filePath").contains("release-bridge-test"));
+        assertTrue("Native photo must exist", new File(saved.getString("filePath")).isFile());
+        Bitmap photo = BitmapFactory.decodeFile(saved.getString("filePath"));
+        assertNotNull("Saved photo must decode", photo);
+        assertEquals("800", String.valueOf(photo.getWidth()));
+        assertEquals("240", String.valueOf(photo.getHeight()));
     }
 
     public void calculatorZonesAndHistoryWorkInReleaseWebView() throws Exception {
