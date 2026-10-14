@@ -14,10 +14,13 @@ for permission in CAMERA READ_EXTERNAL_STORAGE WRITE_EXTERNAL_STORAGE READ_MEDIA
   adb shell pm grant "$app" "android.permission.$permission" 2>/dev/null || true
 done
 adb logcat -c
-adb shell am instrument -w -r "$app.test/androidx.test.runner.AndroidJUnitRunner" | tee smoke-results/instrumentation.txt
+adb shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p "$app"
+sleep 5
+adb shell pidof "$app"
+adb shell am instrument -w -r "$app.test/$app.ReleaseSmokeInstrumentation" | tee smoke-results/instrumentation.txt
 adb logcat -d > smoke-results/logcat.txt
 grep -q 'OK (3 tests)' smoke-results/instrumentation.txt
-if grep -q 'FATAL EXCEPTION' smoke-results/logcat.txt; then
+if grep -q "E AndroidRuntime: Process: $app," smoke-results/logcat.txt; then
   echo 'Unexpected native crash during release smoke tests'
   exit 1
 fi

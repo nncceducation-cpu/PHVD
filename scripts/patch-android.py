@@ -4,13 +4,14 @@ Patches the Capacitor-generated android/ project for a signed Play release.
 
 android/ is regenerated from scratch on every CI run (it is gitignored, exactly
 like ios/), so every change we need has to be reapplied here rather than
-committed. Three things are wrong with the stock Capacitor 6 output:
+committed. Four things need changing in the stock Capacitor 6 output:
 
   1. It targets SDK 34. Google Play requires API 36 for updates from
      31 Aug 2026, so the release build now targets API 36.
   2. compileSdk 36 needs a current Android Gradle Plugin. Capacitor 6 ships 8.2.1.
      So AGP and the Gradle wrapper both move up too.
   3. There is no signing config at all - the stock release buildType is unsigned.
+  4. Release code optimization is disabled, causing Play's DEX warning.
 
 Reads from the environment:
   ANDROID_VERSION_CODE   monotonically increasing integer; Play rejects reuse
@@ -92,6 +93,8 @@ def app_gradle(t: str) -> str:
     # version code / name
     t = re.sub(r"versionCode\s+\d+", f"versionCode {VERSION_CODE}", t)
     t = re.sub(r'versionName\s+"[^"]*"', f'versionName "{VERSION_NAME}"', t)
+    t = t.replace('testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"',
+                  'testInstrumentationRunner "com.khorshidmohammad.phvd.ReleaseSmokeInstrumentation"')
 
     # signingConfigs block, inserted just before buildTypes
     if "signingConfigs {" not in t:
@@ -126,8 +129,8 @@ edit(ANDROID / "app/proguard-rules.pro", lambda _: (ROOT / "scripts/android/prog
 # Run the integration tests against the actual signed, optimized release APK.
 test_dir = ANDROID / "app/src/androidTest/java/com/khorshidmohammad/phvd"
 test_dir.mkdir(parents=True, exist_ok=True)
-(test_dir / "ReleaseBridgeTest.java").write_text(
-    (ROOT / "scripts/android/ReleaseBridgeTest.java").read_text(encoding="utf-8"), encoding="utf-8"
+(test_dir / "ReleaseSmokeInstrumentation.java").write_text(
+    (ROOT / "scripts/android/ReleaseSmokeInstrumentation.java").read_text(encoding="utf-8"), encoding="utf-8"
 )
 
 
@@ -165,6 +168,7 @@ checks = {
         "shrinkResources true",
         "proguard-android-optimize.txt",
         'testBuildType "release"',
+        'testInstrumentationRunner "com.khorshidmohammad.phvd.ReleaseSmokeInstrumentation"',
         f"versionCode {VERSION_CODE}",
         f'versionName "{VERSION_NAME}"',
     ],

@@ -1,6 +1,5 @@
 package com.khorshidmohammad.phvd;
 
-import static org.junit.Assert.*;
 import android.app.Activity;
 import android.app.Instrumentation;
 import android.content.Intent;
@@ -9,31 +8,58 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.os.SystemClock;
+import android.os.Bundle;
 import android.util.Base64;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.WebView;
-import androidx.test.platform.app.InstrumentationRegistry;
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import java.io.ByteArrayOutputStream;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.json.JSONObject;
-import org.junit.Before;
-import org.junit.After;
-import org.junit.Test;
-import org.junit.runner.RunWith;
 
 /** Exercises reflection and the WebView/native bridge in the optimized APK. */
-@RunWith(AndroidJUnit4.class)
-public class ReleaseBridgeTest {
+public class ReleaseSmokeInstrumentation extends Instrumentation {
     private Instrumentation instrumentation;
     private Activity activity;
     private WebView web;
 
-    @Before public void launchRelease() throws Exception {
-        instrumentation = InstrumentationRegistry.getInstrumentation();
+    @Override public void onCreate(Bundle arguments) {
+        super.onCreate(arguments);
+        start();
+    }
+
+    @Override public void onStart() {
+        Bundle result = new Bundle();
+        int completed = 0;
+        try {
+            launchRelease(); pluginsAndNativeCallbacksSurviveR8(); closeRelease(); completed++;
+            launchRelease(); onDeviceOcrAndSavingPhotoSurviveR8(); closeRelease(); completed++;
+            launchRelease(); calculatorZonesAndHistoryWorkInReleaseWebView(); closeRelease(); completed++;
+            result.putString("stream", "\nOK (3 tests)\nNative bridge, OCR/photo saving, calculator/history passed.\n");
+            finish(Activity.RESULT_OK, result);
+        } catch (Throwable failure) {
+            android.util.Log.e("PHVDReleaseSmoke", "Release smoke failed", failure);
+            result.putString("stream", "\nFAILURES: " + completed + "/3 completed\n" + failure + "\n");
+            closeRelease();
+            finish(Activity.RESULT_CANCELED, result);
+        }
+    }
+
+    private static void assertTrue(String message, boolean condition) {
+        if (!condition) throw new AssertionError(message);
+    }
+    private static void assertTrue(boolean condition) { assertTrue("Expected true", condition); }
+    private static void assertNotNull(Object value) { assertTrue("Expected non-null value", value != null); }
+    private static void assertNotNull(String message, Object value) { assertTrue(message, value != null); }
+    private static void assertEquals(String expected, String actual) { assertEquals("Values differ", expected, actual); }
+    private static void assertEquals(String message, String expected, String actual) {
+        assertTrue(message + "; expected=" + expected + ", actual=" + actual, expected.equals(actual));
+    }
+
+    public void launchRelease() throws Exception {
+        instrumentation = this;
         Intent launch = instrumentation.getTargetContext().getPackageManager()
             .getLaunchIntentForPackage("com.khorshidmohammad.phvd");
         assertNotNull(launch);
@@ -44,7 +70,7 @@ public class ReleaseBridgeTest {
         await("!!(window.Capacitor && window.Capacitor.nativePromise && document.querySelector('#root button'))", "true", 60000);
     }
 
-    @After public void closeRelease() {
+    public void closeRelease() {
         if (activity != null) instrumentation.runOnMainSync(() -> activity.finish());
     }
 
@@ -102,7 +128,7 @@ public class ReleaseBridgeTest {
         return Base64.encodeToString(bytes.toByteArray(), Base64.NO_WRAP);
     }
 
-    @Test public void pluginsAndNativeCallbacksSurviveR8() throws Exception {
+    public void pluginsAndNativeCallbacksSurviveR8() throws Exception {
         assertEquals("com.khorshidmohammad.phvd", nativeCall("App", "getInfo", "{}").getString("id"));
         nativeCall("Camera", "checkPermissions", "{}");
         nativeCall("Haptics", "impact", "{\"style\":\"LIGHT\"}");
@@ -113,7 +139,7 @@ public class ReleaseBridgeTest {
         assertTrue(names, names.contains("CapacitorPluginMlKitTextRecognition"));
     }
 
-    @Test public void onDeviceOcrAndSavingPhotoSurviveR8() throws Exception {
+    public void onDeviceOcrAndSavingPhotoSurviveR8() throws Exception {
         String encoded = image();
         JSONObject recognized = nativeCall("CapacitorPluginMlKitTextRecognition", "detectText",
             "{\"base64Image\":" + JSONObject.quote(encoded) + "}");
@@ -127,7 +153,7 @@ public class ReleaseBridgeTest {
         assertTrue(saved.toString(), saved.getString("filePath").contains("release-bridge-test"));
     }
 
-    @Test public void calculatorZonesAndHistoryWorkInReleaseWebView() throws Exception {
+    public void calculatorZonesAndHistoryWorkInReleaseWebView() throws Exception {
         js("localStorage.setItem('phvd-language','en');true");
         js("(()=>{const english=[...document.querySelectorAll('button')].find(b=>b.textContent==='English');if(english)english.click();return true})()");
         // Language selection may mount the disclaimer on the following frame.

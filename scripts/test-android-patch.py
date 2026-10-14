@@ -27,6 +27,6 @@ with tempfile.TemporaryDirectory(prefix="android-patch-test-", dir=root) as temp
     assert "minifyEnabled false" not in gradle
     assert "proguard-android.txt" not in gradle
     assert "minifyEnabled true" in gradle and "shrinkResources true" in gradle
-    assert (android / "app/src/androidTest/java/com/khorshidmohammad/phvd/ReleaseBridgeTest.java").exists()
+    assert (android / "app/src/androidTest/java/com/khorshidmohammad/phvd/ReleaseSmokeInstrumentation.java").exists()
     assert "-dontobfuscate" not in (android / "app/proguard-rules.pro").read_text(encoding="utf-8")
 print("PASS: real Capacitor template, optimized release, signing, plugin rules, repeat application")
