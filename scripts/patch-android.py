@@ -25,15 +25,15 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-ANDROID = ROOT / "android"
+ANDROID = Path(os.environ.get("ANDROID_PROJECT_DIR", ROOT / "android"))
 
 MIN_SDK = "24"  # Required by this app's existing Play automatic protection.
 TARGET_SDK = "36"
-AGP_VERSION = "8.9.1"
+AGP_VERSION = "8.10.1"  # Includes the R8 metadata used by Android vitals.
 GRADLE_VERSION = "8.11.1"
 
-VERSION_CODE = os.environ.get("ANDROID_VERSION_CODE", "10")
-VERSION_NAME = os.environ.get("ANDROID_VERSION_NAME", "1.6.1")
+VERSION_CODE = os.environ.get("ANDROID_VERSION_CODE", "11")
+VERSION_NAME = os.environ.get("ANDROID_VERSION_NAME", "1.6.2")
 
 failures = []
 
@@ -42,9 +42,9 @@ def edit(path: Path, fn):
     if not path.exists():
         failures.append(f"missing: {path.relative_to(ROOT)}")
         return
-    before = path.read_text()
+    before = path.read_text(encoding="utf-8")
     after = fn(before)
-    path.write_text(after)
+    path.write_text(after, encoding="utf-8")
     print(f"  patched {path.relative_to(ROOT)}")
 
 
@@ -97,17 +97,38 @@ def app_gradle(t: str) -> str:
     if "signingConfigs {" not in t:
         t = t.replace("    buildTypes {", SIGNING + "    buildTypes {", 1)
 
-    # wire the release buildType to it
-    if "signingConfig signingConfigs.release" not in t:
-        t = t.replace(
-            "        release {\n            minifyEnabled false",
-            "        release {\n            signingConfig signingConfigs.release\n            minifyEnabled false",
-            1,
-        )
+    # Replace only the buildTypes release block (not signingConfigs.release).
+    # Keep Capacitor's consumer rules, which protect reflective plugin loading.
+    start = t.index("    buildTypes {")
+    head, build_types = t[:start], t[start:]
+    build_types = re.sub(
+        r"release\s*\{[^{}]*\}",
+        "release {\n"
+        "            signingConfig signingConfigs.release\n"
+        "            minifyEnabled true\n"
+        "            shrinkResources true\n"
+        "            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'\n"
+        "        }",
+        build_types, count=1,
+    )
+    t = head + build_types
+    if 'testBuildType "release"' not in t:
+        t = t.replace("    buildTypes {", '    testBuildType "release"\n    buildTypes {', 1)
     return t
 
 
 edit(ANDROID / "app/build.gradle", app_gradle)
+
+# The JavaScript bridge must retain its annotated entry points. Plugin classes,
+# constructors, methods and callbacks are kept by Capacitor's consumer rules.
+edit(ANDROID / "app/proguard-rules.pro", lambda _: (ROOT / "scripts/android/proguard-rules.pro").read_text(encoding="utf-8"))
+
+# Run the integration tests against the actual signed, optimized release APK.
+test_dir = ANDROID / "app/src/androidTest/java/com/khorshidmohammad/phvd"
+test_dir.mkdir(parents=True, exist_ok=True)
+(test_dir / "ReleaseBridgeTest.java").write_text(
+    (ROOT / "scripts/android/ReleaseBridgeTest.java").read_text(encoding="utf-8"), encoding="utf-8"
+)
 
 
 # 4 -- CAMERA permission for the measurement-scan feature (on-device OCR).
@@ -140,6 +161,10 @@ checks = {
     ANDROID / "app/build.gradle": [
         "signingConfigs {",
         "signingConfig signingConfigs.release",
+        "minifyEnabled true",
+        "shrinkResources true",
+        "proguard-android-optimize.txt",
+        'testBuildType "release"',
         f"versionCode {VERSION_CODE}",
         f'versionName "{VERSION_NAME}"',
     ],
@@ -150,7 +175,7 @@ checks = {
 
 print("\nverifying:")
 for path, needles in checks.items():
-    text = path.read_text() if path.exists() else ""
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
     for needle in needles:
         if needle in text:
             print(f"  ok   {needle}")
