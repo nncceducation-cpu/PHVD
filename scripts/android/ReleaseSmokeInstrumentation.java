@@ -131,6 +131,7 @@ public class ReleaseSmokeInstrumentation extends Instrumentation {
     public void pluginsAndNativeCallbacksSurviveR8() throws Exception {
         assertEquals("com.khorshidmohammad.phvd", nativeCall("App", "getInfo", "{}").getString("id"));
         nativeCall("Camera", "checkPermissions", "{}");
+        nativeCall("Camera", "requestPermissions", "{\"permissions\":[\"camera\"]}");
         nativeCall("Haptics", "impact", "{\"style\":\"LIGHT\"}");
         nativeCall("StatusBar", "getInfo", "{}");
         String names = js("window.Capacitor.PluginHeaders.map(p=>p.name)");
