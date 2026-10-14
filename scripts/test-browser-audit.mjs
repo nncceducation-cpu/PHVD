@@ -81,6 +81,18 @@ try {
       assert.deepEqual(errors,[]);
     } finally {await context.close();}
   });
+  await run('Save history without crypto.randomUUID',async()=>{
+    const {context,page}=await open();
+    try {
+      await page.evaluate(()=>Object.defineProperty(crypto,'randomUUID',{value:undefined,configurable:true}));
+      await fill(page);await page.getByRole('button',{name:'Save Measurement',exact:true}).click();
+      await fill(page,[28,11,11,8,8,.75]);await page.getByRole('button',{name:'Save Measurement',exact:true}).click();
+      const rows=await page.evaluate(()=>JSON.parse(localStorage.getItem('phvd_data')));
+      assert.equal(rows.length,2);assert.notEqual(rows[0].id,rows[1].id);
+      await page.reload();await page.locator('#root button').first().click();
+      assert.equal(await page.locator('main svg[role=img]:not([aria-hidden=true] svg) circle').count(),4);
+    }finally{await context.close();}
+  });
   await run('Local date near UTC midnight',async()=>{
     const {context,page}=await open({clock:'2026-10-14T01:30:00Z'});
     try {assert.equal(await page.locator('input[type=date]').inputValue(),'2026-10-13');} finally {await context.close();}

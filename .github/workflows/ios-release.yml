@@ -9,7 +9,7 @@ on:
       build_number:
         description: 'Build number (must be higher than the last upload)'
         required: true
-        default: '23'
+        default: '24'
       marketing_version:
         description: 'Marketing version (CFBundleShortVersionString, must be higher than any App Store version)'
         required: true

@@ -19,7 +19,7 @@ import { saveElementToPhotos, downloadElementAsPng, isSaveToPhotosAvailable } fr
 
 import { getVIP97, getRiskZone, type RiskZone } from '../lib/risk';
 import NumericInput from './NumericInput';
-import { readHistory, measurementError, localDate, type Measurement } from '../lib/history';
+import { readHistory, measurementError, measurementId, localDate, type Measurement } from '../lib/history';
 
 const getManagementAdvice = (zone: RiskZone) => {
   switch (zone) {
@@ -133,8 +133,8 @@ const PHVD: React.FC = () => {
     const error = measurementError(currentM);
     if (error) { alert(error); return; }
     if (savedSignature === JSON.stringify(currentM)) return;
+    const newEntry = { ...currentM, id: measurementId() };
     setHistoryChanged(true);
-    const newEntry = { ...currentM, id: crypto.randomUUID() };
     setMeasurements((previous) => [...previous, newEntry].sort((a, b) => a.pma - b.pma || a.date.localeCompare(b.date)));
     // Retain the assessment so downloading immediately after Save exports it.
     setSavedSignature(JSON.stringify(currentM));

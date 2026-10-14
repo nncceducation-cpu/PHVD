@@ -58,12 +58,15 @@ export function parseNumbers(text: string): DetectedNumber[] {
   // Match numbers optionally followed by cm/mm. A caliper list looks like
   // "1 d1 2.26 cm  2 d1 1.73 cm ..."; the leading "1 d1" index digits are bare
   // integers and are dropped, leaving the real "2.26 cm" values.
-  const re = /(?<![\w.,-])(\d+(?:[.,]\d+)?)\s*(cm|mm)\b/gi;
+  const re = /(\d+(?:[.,]\d+)?)\s*(cm|mm)\b/gi;
   const out: DetectedNumber[] = [];
   let m: RegExpExecArray | null;
   let i = 0;
   let seq = 0;
   while ((m = re.exec(cleaned)) !== null) {
+    // Avoid lookbehind, which older iOS WebViews cannot parse. Checking the
+    // preceding character preserves rejection of embedded/malformed numbers.
+    if (m.index > 0 && /[\w.,-]/.test(cleaned[m.index - 1])) continue;
     const numStr = m[1].replace(',', '.');
     const unit = (m[2] || '').toLowerCase() as 'cm' | 'mm' | '';
     const value = parseFloat(numStr);
