@@ -26,7 +26,7 @@ with zipfile.ZipFile(aab) as bundle:
     assert dex_bytes < 11471028, "R8 did not reduce DEX size compared with build 10"
     assets = {name: hashlib.sha256(bundle.read(name)).hexdigest() for name in bundle.namelist()
               if name.startswith("base/assets/public/assets/") and name.endswith(".js")}
-    assert "0bc054c43e94e0f844abe427f2348feba6787617b2c8e0068d65c6e314129ebe" in assets.values(), "Calculator bundle changed from tested build 10"
+    assert "2f4b3613680b85e042f920088143ee8c6a2e1f88330dcfa9a5ae228ed9fa3188" in assets.values(), "Interface bundle differs from the tested Android-compatible build"
     native_alignments = {}
     for name in bundle.namelist():
         if name.endswith(".so") and any(abi in name for abi in ["/arm64-v8a/", "/x86_64/"]):

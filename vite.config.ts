@@ -5,6 +5,10 @@ export default defineConfig({
   plugins: [react()],
   base: './',
   build: {
+    // Android's older system WebViews need optional chaining and nullish
+    // coalescing lowered instead of Vite's default modern-browser output.
+    target: 'chrome63',
+    cssTarget: 'chrome63',
     outDir: 'dist',
     sourcemap: false,
   },
