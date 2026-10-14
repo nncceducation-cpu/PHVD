@@ -2,6 +2,7 @@
 set -euo pipefail
 mkdir -p smoke-results
 app=com.khorshidmohammad.phvd
+trap 'adb logcat -d > smoke-results/logcat.txt; adb shell dumpsys package "$app" > smoke-results/package.txt' EXIT
 apk=$(find out -maxdepth 1 -name '*.apk' ! -name '*-test.apk')
 test_apk=$(find out -maxdepth 1 -name '*-test.apk')
 test -f "$apk"
@@ -14,7 +15,8 @@ for permission in CAMERA READ_EXTERNAL_STORAGE WRITE_EXTERNAL_STORAGE READ_MEDIA
   adb shell pm grant "$app" "android.permission.$permission" 2>/dev/null || true
 done
 adb logcat -c
-adb shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p "$app"
+adb shell dumpsys package "$app" > smoke-results/package-before-start.txt
+adb shell am start -W -n "$app/.MainActivity"
 sleep 5
 adb shell pidof "$app"
 adb shell am instrument -w -r "$app.test/$app.ReleaseSmokeInstrumentation" | tee smoke-results/instrumentation.txt
